@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+
+{% set active_page = 'deteccion' %}
+{% set s = stats | default({}) %}
+{% set detections = detections | default([]) %}
+
+{% block title %}Detección · Security Awareness{% endblock %}
+
+{% macro risk_badge(score) -%}
+    {% if score >= 70 %}<span class="badge risk-high">{{ score }}</span>
+    {% elif score >= 40 %}<span class="badge risk-medium">{{ score }}</span>
+    {% else %}<span class="badge risk-low">{{ score }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="mb-3">
+    <h1>Detección heurística</h1>
+    <p class="text-muted">Alertas generadas por la extensión del navegador y el motor de análisis de riesgo</p>
+</div>
+
+<!-- ===================== KPIs ===================== -->
+<div class="stat-grid mb-3">
+    <div class="stat-card">
+        <div class="stat-label">Correos analizados</div>
+        <div class="stat-value">{{ s.get('analizados', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Amenazas detectadas</div>
+        <div class="stat-value">{{ s.get('detectados', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Riesgo alto</div>
+        <div class="stat-value">{{ s.get('riesgo_alto', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Precisión estimada</div>
+        <div class="stat-value">{{ s.get('precision', '—') }}<span class="unit">%</span></div>
+    </div>
+</div>
+
+<!-- ===================== Historial de detecciones ===================== -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Historial de detecciones</h2>
+        <span class="badge badge-neutral">{{ detections|length }} registros</span>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Empleado</th>
+                    <th>Asunto</th>
+                    <th>Remitente</th>
+                    <th>Score</th>
+                    <th>Reglas disparadas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in detections %}
+                <tr>
+                    <td>{{ d.get('fecha', '') }}</td>
+                    <td>{{ d.get('empleado', '') }}</td>
+                    <td>{{ d.get('asunto', '') }}</td>
+                    <td>{{ d.get('remitente', '') }}</td>
+                    <td>{{ risk_badge(d.get('score', 0)) }}</td>
+                    <td>
+                        {% for r in d.get('reglas', []) %}
+                            <span class="badge badge-neutral">{{ r }}</span>{% if not loop.last %} {% endif %}
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Aún no hay detecciones registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,255 @@
+{% extends "layout.html" %}
+
+{% set active_page = 'simulacion' %}
+
+{% block title %}Campañas · Security Awareness{% endblock %}
+
+{% block head %}
+<style>
+    .mail-preview {
+        background: var(--bg-page);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    .mail-meta {
+        background: var(--bg-surface-2);
+        border-bottom: 1px solid var(--border-soft);
+        padding: .75rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: .35rem;
+    }
+    .mail-row {
+        display: flex;
+        gap: .6rem;
+        font-size: .9rem;
+    }
+    .mail-label {
+        color: var(--text-muted);
+        min-width: 64px;
+        flex-shrink: 0;
+    }
+    .mail-body {
+        padding: 1.3rem 1.3rem;
+        font-size: .95rem;
+        line-height: 1.6;
+        color: var(--text);
+    }
+    .mail-body p { margin-bottom: .75rem; }
+    .mail-body a {
+        display: inline-block;
+        color: var(--accent);
+        text-decoration: underline;
+        font-weight: 600;
+        margin: .25rem 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <h1>Campañas de phishing</h1>
+    <p class="text-muted">Crea y envía campañas de simulación para entrenar a tus empleados</p>
+</div>
+
+<!-- ===================== Configuración ===================== -->
+<div class="card mb-3">
+    <div class="form-group" style="max-width: 460px;">
+        <label for="campaignName">Nombre de la campaña</label>
+        <input type="text" id="campaignName" placeholder="Ej. Simulacro trimestral Q3">
+    </div>
+
+    <button type="button" id="btnGenerate" class="btn btn-primary mt-2">Generar campaña</button>
+    <p class="form-hint mt-1">Genera un correo de phishing de ejemplo para tu campaña.</p>
+</div>
+
+<!-- ===================== Vista previa del correo ===================== -->
+<div class="card" id="previewCard" hidden>
+    <div class="card-header">
+        <h2 class="card-title">Vista previa del correo</h2>
+        <span class="badge badge-cyan">Simulado</span>
+    </div>
+
+    <!-- Modo vista previa -->
+    <div class="mail-preview" id="previewView">
+        <div class="mail-meta">
+            <div class="mail-row"><span class="mail-label">De:</span><span id="previewFrom"></span></div>
+            <div class="mail-row"><span class="mail-label">Asunto:</span><span id="previewSubject"></span></div>
+        </div>
+        <div class="mail-body" id="previewBody"></div>
+    </div>
+
+    <!-- Modo edición -->
+    <div id="previewEdit" hidden>
+        <div class="form-group mb-1">
+            <label for="editFrom">De (remitente):</label>
+            <input type="text" id="editFrom">
+        </div>
+        <div class="form-group mb-1">
+            <label for="editSubject">Asunto:</label>
+            <input type="text" id="editSubject">
+        </div>
+        <div class="form-group mb-1">
+            <label for="editBody">Cuerpo del correo (HTML permitido):</label>
+            <textarea id="editBody" rows="14"></textarea>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap mt-2">
+        <button type="button" id="btnTryAnother" class="btn btn-secondary">Prueba otro</button>
+        <button type="button" id="btnCustomize" class="btn btn-outline">Customizar correo</button>
+        <button type="button" id="btnSend" class="btn btn-primary">Enviar campaña</button>
+    </div>
+</div>
+
+{# Formulario oculto que se envía al backend con los datos del correo #}
+<form id="sendForm" method="post" action="{{ url_for('enviar_campana') }}" hidden>
+    <input type="hidden" name="nombre" id="fNombre">
+    <input type="hidden" name="remitente" id="fRemitente">
+    <input type="hidden" name="asunto" id="fAsunto">
+    <input type="hidden" name="cuerpo" id="fCuerpo">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    "use strict";
+
+    // Plantillas de correos de phishing (genéricas y seguras para entrenamiento)
+    var TEMPLATES = [
+        {
+            from: "Seguridad <seguridad@bancoseguro.com.co>",
+            subject: "Acción requerida: verifica tu cuenta",
+            body: "<p>Hola,</p>" +
+                  "<p>Hemos detectado actividad inusual en tu cuenta. Para evitar el bloqueo temporal, " +
+                  "verifica tu identidad en las próximas 24 horas.</p>" +
+                  "<p><a href=\"#\">Verificar mi cuenta ahora</a></p>" +
+                  "<p>Atentamente,<br>Equipo de Seguridad</p>"
+        },
+        {
+            from: "Facturación <facturas@proveedores.co>",
+            subject: "Factura pendiente de pago",
+            body: "<p>Estimado cliente,</p>" +
+                  "<p>Adjuntamos una factura pendiente de pago. Si no se regulariza en 48 horas, " +
+                  "el servicio podría ser suspendido.</p>" +
+                  "<p><a href=\"#\">Descargar factura</a></p>" +
+                  "<p>Departamento de Facturación</p>"
+        },
+        {
+            from: "Correo Corporativo <noreply@tuempresa.co>",
+            subject: "Tu buzón de correo está lleno",
+            body: "<p>Hola,</p>" +
+                  "<p>Tu buzón alcanzó el 98% de su capacidad. Libera espacio o actualiza tu plan " +
+                  "para no perder correos importantes.</p>" +
+                  "<p><a href=\"#\">Administrar mi buzón</a></p>" +
+                  "<p>Soporte de Correo Corporativo</p>"
+        },
+        {
+            from: "Premios y Sorteos <premios@sorteos.co>",
+            subject: "¡Felicidades! Has sido seleccionado",
+            body: "<p>¡Felicidades!</p>" +
+                  "<p>Has sido seleccionado para recibir un premio especial. Reclama tu beneficio " +
+                  "antes de que expire.</p>" +
+                  "<p><a href=\"#\">Reclamar mi premio</a></p>" +
+                  "<p>Equipo de Premios</p>"
+        },
+        {
+            from: "Soporte TI <soporte.ti@tuempresa.co>",
+            subject: "Actualización de contraseña requerida",
+            body: "<p>Hola,</p>" +
+                  "<p>Por políticas de seguridad, tu contraseña expira hoy. Actualízala para " +
+                  "mantener el acceso a tus herramientas de trabajo.</p>" +
+                  "<p><a href=\"#\">Actualizar contraseña</a></p>" +
+                  "<p>Departamento de TI</p>"
+        }
+    ];
+
+    var current = null;
+    var isEditMode = false;
+
+    var btnGenerate  = document.getElementById('btnGenerate');
+    var btnTryAnother = document.getElementById('btnTryAnother');
+    var btnCustomize = document.getElementById('btnCustomize');
+    var btnSend      = document.getElementById('btnSend');
+    var previewCard  = document.getElementById('previewCard');
+
+    function randomTemplate() {
+        return TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
+    }
+
+    function render() {
+        var view = document.getElementById('previewView');
+        var edit = document.getElementById('previewEdit');
+
+        if (isEditMode) {
+            document.getElementById('editFrom').value = current.from;
+            document.getElementById('editSubject').value = current.subject;
+            document.getElementById('editBody').value = current.body;
+            view.hidden = true;
+            edit.hidden = false;
+        } else {
+            document.getElementById('previewFrom').textContent = current.from;
+            document.getElementById('previewSubject').textContent = current.subject;
+            document.getElementById('previewBody').innerHTML = current.body;
+            view.hidden = false;
+            edit.hidden = true;
+        }
+    }
+
+    function generate() {
+        current = randomTemplate();
+        previewCard.hidden = false;
+        render();
+        previewCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function tryAnother() {
+        current = randomTemplate();
+        render();
+    }
+
+    function toggleCustomize() {
+        if (isEditMode) {
+            // Guardar lo editado y volver a la vista previa
+            current.from = document.getElementById('editFrom').value;
+            current.subject = document.getElementById('editSubject').value;
+            current.body = document.getElementById('editBody').value;
+            isEditMode = false;
+            btnCustomize.textContent = 'Customizar correo';
+        } else {
+            isEditMode = true;
+            btnCustomize.textContent = 'Ver vista previa';
+        }
+        render();
+    }
+
+    function send() {
+        var from, subject, body;
+
+        if (isEditMode) {
+            from = document.getElementById('editFrom').value;
+            subject = document.getElementById('editSubject').value;
+            body = document.getElementById('editBody').value;
+        } else {
+            from = current.from;
+            subject = current.subject;
+            body = current.body;
+        }
+
+        document.getElementById('fNombre').value = document.getElementById('campaignName').value.trim();
+        document.getElementById('fRemitente').value = from;
+        document.getElementById('fAsunto').value = subject;
+        document.getElementById('fCuerpo').value = body;
+
+        document.getElementById('sendForm').submit();
+    }
+
+    btnGenerate.addEventListener('click', generate);
+    btnTryAnother.addEventListener('click', tryAnother);
+    btnCustomize.addEventListener('click', toggleCustomize);
+    btnSend.addEventListener('click', send);
+})();
+</script>
+{% endblock %}

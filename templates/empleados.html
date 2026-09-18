@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% set active_page = 'empleados' %}
+{% set s = stats | default({}) %}
+{% set employees = employees | default([]) %}
+
+{% block title %}Empleados · Security Awareness{% endblock %}
+
+{% macro risk_badge(score) -%}
+    {% if score >= 70 %}<span class="badge risk-high">{{ score }}</span>
+    {% elif score >= 40 %}<span class="badge risk-medium">{{ score }}</span>
+    {% else %}<span class="badge risk-low">{{ score }}</span>
+    {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div class="flex-between mb-3">
+    <div>
+        <h1>Empleados</h1>
+        <p class="text-muted">Personal registrado y su nivel de riesgo frente al phishing</p>
+    </div>
+    <a class="btn btn-primary" href='{{ url_for('empleado_nuevo') }}'>+ Agregar empleado</a>
+</div>
+
+<!-- ===================== KPIs ===================== -->
+<div class="stat-grid mb-3">
+    <div class="stat-card">
+        <div class="stat-label">Total empleados</div>
+        <div class="stat-value">{{ s.get('total', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Riesgo alto</div>
+        <div class="stat-value">{{ s.get('riesgo_alto', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Clics en simulacros</div>
+        <div class="stat-value">{{ s.get('clics', '—') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Activos</div>
+        <div class="stat-value">{{ s.get('activos', '—') }}</div>
+    </div>
+</div>
+
+<!-- ===================== Listado ===================== -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Listado de empleados</h2>
+        <span class="badge badge-neutral">{{ employees|length }} registros</span>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Empresa</th>
+                    <th>Riesgo</th>
+                    <th>Clics</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in employees %}
+                <tr>
+                    <td>{{ e.get('nombre', '') }}</td>
+                    <td>{{ e.get('email', '') }}</td>
+                    <td>{{ e.get('empresa', '') }}</td>
+                    <td>{{ risk_badge(e.get('riesgo', 0)) }}</td>
+                    <td>{{ e.get('clics', 0) }}</td>
+                    <td>
+                        {% if e.get('activo', true) %}
+                            <span class="badge badge-green">Activo</span>
+                        {% else %}
+                            <span class="badge badge-neutral">Inactivo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Aún no hay empleados registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
