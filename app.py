@@ -11,13 +11,19 @@ import contextvars
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, Annotated
 
-from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile, status
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.exceptions import RequestValidationError
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from schemas import SimulacionCreate, SimulacionResponse
+import models
+from database import Base, engine, get_db 
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -27,6 +33,8 @@ load_dotenv(dotenv_path=env_path)
 SECRET_KEY = os.getenv("SECRET_KEY")
 if SECRET_KEY is None:
     raise ValueError("SECRET_KEY is not setup. Please set environment variable.")
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Plataforma de Security Awareness")
 
@@ -39,9 +47,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 
-# ---------------------------------------------------------------------------
-# Flash messages: exponen get_flashed_messages() dentro de los templates
-# ---------------------------------------------------------------------------
+
+# Flash messages, exponen get_flashed_messages() dentro de los templates
 _request_ctx: contextvars.ContextVar[Request] = contextvars.ContextVar("_request")
 
 
@@ -67,30 +74,9 @@ def get_flashed_messages(with_categories: bool = False):
 templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
 
-def placeholder_html(title: str) -> str:
-    """Página temporal para las rutas cuyo template aún no existe."""
-    return f"""<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} · Security Awareness</title>
-</head>
-<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-background:#070f1c;color:#e8eef7;font-family:'Segoe UI',system-ui,sans-serif">
-<div style="text-align:center;padding:2rem">
-<h1 style="margin:0 0 .5rem">{title}</h1>
-<p style="color:#6f88a6;margin:0 0 1.25rem">Página en construcción</p>
-<a href="/" style="color:#38bdf8">← Volver al dashboard</a>
-</div>
-</body>
-</html>"""
-
-
-# ---------------------------------------------------------------------------
-# Rutas
-# ---------------------------------------------------------------------------
+# RUTAS
 @app.get("/", name="dashboard")
+@app.get("/home", name="dashboard")
 async def dashboard(request: Request):
     stats = {
         "empleados": 48,
@@ -128,14 +114,9 @@ async def empleado_nuevo(request: Request):
     return templates.TemplateResponse(request, "empleado_nuevo.html", {})
 
 
-@app.get("/empresas", name="empresas")
-async def empresas(request: Request):
-    return HTMLResponse(placeholder_html("Empresas"))
-
-
 @app.get("/recuperar-contrasena", name="forgot_password")
 async def forgot_password(request: Request):
-    return HTMLResponse(placeholder_html("Recuperar contraseña"))
+    pass
 
 
 @app.get("/login", name="login")
@@ -145,7 +126,6 @@ async def login_form(request: Request):
 
 @app.post("/login")
 async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
-    # TODO: autenticación real
     flash(request, f"Sesión iniciada como «{username}» (demo).", "success")
     return RedirectResponse("/", status_code=303)
 
@@ -158,10 +138,9 @@ async def enviar_campana(
     asunto: str = Form(),
     cuerpo: str = Form(),
 ):
-    # TODO: guardar la campaña y enviar los correos de simulación
     flash(
         request,
-        f"Campaña «{nombre or 'Sin nombre'}» creada (demo). Envío pendiente de implementar.",
+        f"Campaña «{nombre or 'Sin nombre'}» creada (demo). Envío pendiente.",
         "success",
     )
     return RedirectResponse("/simulacion", status_code=303)
@@ -175,7 +154,6 @@ async def ingresar__nuevo_empleado(
     empresa: str = File(),
     cargo: str = File(),
 ):
-    # TODO: guardar la campaña y enviar los correos de simulación
     flash(
         request,
         f"Empleado «{nombre or 'Failed to load EE name'}» ingresado exitosamente.",
@@ -189,7 +167,6 @@ async def importar_empleado(
     request: Request,
     archivo: UploadFile = File(),
 ):
-    # TODO: guardar la campaña y enviar los correos de simulación
     flash(
         request,
         f"Archivo CSV «{archivo.filename or 'Sin nombre'}» importado exitosamente.",
@@ -198,7 +175,42 @@ async def importar_empleado(
     return RedirectResponse("/empleados", status_code=303)
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.exception_handler(StarletteHTTPException)
+async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
+    error_message = (
+        exception.detail if exception.detail else "Ha ocurrido un error. Por favor verifica tu solicitud e intenta nuevamente."
+    )
 
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    if request.url.path.startswith("/api"):
+        return JSONResponse(
+            status_code=exception.status_code,
+            content={"detail": error_message}
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {"status_code": exception.status_code, 
+         "error_title": exception.status_code,
+        "error_message": error_message
+        },
+        status_code=exception.status_code
+    )
+
+@app.exception_handler(RequestValidationError)
+async def general_validation_error(request: Request, exception: RequestValidationError): 
+    if request.url.path.startswith("/api"):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": exception.errors()}   
+        )
+    
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {"status_code": status.HTTP_422_UNPROCESSABLE_CONTENT, 
+         "error_title": status.HTTP_422_UNPROCESSABLE_CONTENT,
+         "error_message": "Solicitud invalida. Revisa tu solicitud e intenta nuevamente."
+        },
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT
+        )
