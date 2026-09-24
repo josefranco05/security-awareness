@@ -13,13 +13,16 @@ import os
 from dotenv import load_dotenv
 from typing import Optional, Annotated
 
-from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile, status
+from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from schemas import SimulacionCreate, SimulacionResponse
 import models
@@ -84,7 +87,11 @@ async def dashboard(request: Request):
         "correos_detectados": 132,
         "tasa_clics": 18,
     }
-    return templates.TemplateResponse(request, "dashboard.html", {"stats": stats})
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {"stats": stats}
+    )
 
 
 @app.get("/deteccion", name="deteccion")
@@ -149,11 +156,17 @@ async def enviar_campana(
 @app.post("/empleado-nuevo", name="empleado_nuevo")
 async def ingresar__nuevo_empleado(
     request: Request,
-    nombre: str = File(),
-    email: str = File(),
-    empresa: str = File(),
-    cargo: str = File(),
+    db: Annotated[Session, Depends(get_db)],
+    nombre: Annotated[str, Form()],
+    email: Annotated[str, Form()],
+    empresa: Annotated[str, Form()],
+    cargo: Annotated[str, Form()] = ""
 ):
+
+    new_ee = models.Empleados(
+        
+    )
+    
     flash(
         request,
         f"Empleado «{nombre or 'Failed to load EE name'}» ingresado exitosamente.",
