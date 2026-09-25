@@ -6,12 +6,16 @@ Ejecutar:
     pip install fastapi uvicorn jinja2 python-multipart itsdangerous
     uvicorn app:app --reload        # luego abrir http://127.0.0.1:8000
 """
+from __future__ import annotations
 
 import contextvars
 from pathlib import Path
 import os
 from dotenv import load_dotenv
 from typing import Optional, Annotated
+from datetime import datetime
+
+from pydantic import ValidationError
 
 from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -24,7 +28,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from schemas import SimulacionCreate, SimulacionResponse
+from schemas import SimulacionCreate, SimulacionResponse, EmpleadosCreate, EmpleadosResponse
 import models
 from database import Base, engine, get_db 
 
@@ -78,8 +82,8 @@ templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
 
 # RUTAS
-@app.get("/", name="dashboard")
-@app.get("/home", name="dashboard")
+@app.get("/", name="dashboard", include_in_schema=False)
+@app.get("/home", name="dashboard", include_in_schema=False)
 async def dashboard(request: Request):
     stats = {
         "empleados": 48,
@@ -153,7 +157,7 @@ async def enviar_campana(
     return RedirectResponse("/simulacion", status_code=303)
 
 
-@app.post("/empleado-nuevo", name="empleado_nuevo")
+@app.post("/empleado-nuevo", name="empleado_manual")
 async def ingresar__nuevo_empleado(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
@@ -162,17 +166,45 @@ async def ingresar__nuevo_empleado(
     empresa: Annotated[str, Form()],
     cargo: Annotated[str, Form()] = ""
 ):
+    payload = EmpleadosCreate(
+                nombre=nombre,
+                email=email,
+                empresa=empresa,
+                cargo=cargo
+            )
+    try:
+        EmpleadosCreate.model_validate(payload)
+    except ValidationError as e:
+        flash(
+                request,
+                f"Error {e} importando empleado «{nombre or 'Sin nombre'}». Intenta nuevamente.",
+                "Error",
+            )
+        return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
 
-    new_ee = models.Empleados(
+    user = db.execute(select(models.Empleados).where(models.Empleados.email == payload.email))
+    result = user.scalars().first()
         
-    )
+    if result:
+        flash(
+            request,
+            f"Ya existe un empleado «{nombre or 'Sin nombre'} con correo {email}». Intenta nuevamente.",
+            "Error",
+        )
+        return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
+
+    entry = models.Empleados(**payload.model_dump())
+
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
     
     flash(
         request,
         f"Empleado «{nombre or 'Failed to load EE name'}» ingresado exitosamente.",
-        "success",
+        "Success",
     )
-    return RedirectResponse("/empleados", status_code=303)
+    return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/empleado-importar", name="empleado_importar")

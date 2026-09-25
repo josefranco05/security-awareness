@@ -6,49 +6,57 @@
 
 {% block head %}
 <style>
-.tabs {
-    display: flex;
-    gap: .25rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1.25rem;
+    .tabs {
+        display: flex;
+        gap: .25rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 1.25rem;
     }
 
-.tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--text-secondary);
-    font-family: inherit;
-    font-weight: 600;
-    font-size: .95rem;
-    padding: .6rem 1rem;
-    cursor: pointer;
-    transition: color .15s ease, border-color .15s ease;
+    .tab {
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-secondary);
+        font-family: inherit;
+        font-weight: 600;
+        font-size: .95rem;
+        padding: .6rem 1rem;
+        cursor: pointer;
+        transition: color .15s ease, border-color .15s ease;
     }
 
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-input[type="file"] {
-    color: var(--text-secondary);
-    font-family: inherit;
-    font-size: .95rem;
+    .tab:hover {
+        color: var(--text);
     }
 
-input[type="file"]::file-selector-button {
-    background: var(--bg-elevated);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: .5rem .9rem;
-    margin-right: .75rem;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: 600;
-    transition: background .15s ease;
+    .tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
     }
 
-input[type="file"]::file-selector-button:hover { background: var(--bg-surface-2); }
+    input[type="file"] {
+        color: var(--text-secondary);
+        font-family: inherit;
+        font-size: .95rem;
+    }
+
+    input[type="file"]::file-selector-button {
+        background: var(--bg-elevated);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: .5rem .9rem;
+        margin-right: .75rem;
+        cursor: pointer;
+        font-family: inherit;
+        font-weight: 600;
+        transition: background .15s ease;
+    }
+
+    input[type="file"]::file-selector-button:hover {
+        background: var(--bg-surface-2);
+    }
 </style>
 {% endblock %}
 
@@ -70,7 +78,7 @@ input[type="file"]::file-selector-button:hover { background: var(--bg-surface-2)
     <!-- ===================== Alta manual ===================== -->
     <div class="tab-panel" id="panel-manual">
         {# POST a la ruta 'empleado_nuevo'. Campos: nombre, email, empresa, cargo #}
-        <form method="post" action="{{ url_for('empleado_nuevo') }}">
+        <form method="post" action="{{ url_for('empleado_manual') }}">
             <div class="form-grid">
                 <div class="form-group">
                     <label for="nombre">Nombre completo</label>
