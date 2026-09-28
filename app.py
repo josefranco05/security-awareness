@@ -25,7 +25,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from sqlalchemy import select
+from sqlalchemy import select, func, ScalarResult
 from sqlalchemy.orm import Session
 
 from schemas import SimulacionCreate, SimulacionResponse, EmpleadosCreate, EmpleadosResponse
@@ -82,7 +82,7 @@ templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
 
 # RUTAS
-@app.get("/", name="dashboard", include_in_schema=False)
+@app.get("/", name="home", include_in_schema=False)
 @app.get("/home", name="dashboard", include_in_schema=False)
 async def dashboard(request: Request):
     stats = {
@@ -108,17 +108,24 @@ async def simulacion(request: Request):
     return templates.TemplateResponse(request, "campaigns.html", {})
 
 
-@app.get("/empleados", name="empleados")
-async def empleados(request: Request):
-    empleados = [{
-        "nombre": "Jose Miguel Franco",
-        "email": "email@email.com",
-        "empresa": "Prueba",
-        "riesgo": 50,
-        "clics": 12,
-        "activo": True
-    }]
-    return templates.TemplateResponse(request, "empleados.html", {"employees": empleados})
+@app.get("/empleados", name="empleados", include_in_schema=False)
+async def empleados(
+    request: Request, 
+    db: Annotated[Session, Depends(get_db)]
+    ):
+
+    total_ees = db.scalar(select(func.count()).select_from(models.Empleados))
+    high_risk = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.riesgo >= 70))
+    activos = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.estado == True))
+        
+    all_ees = db.scalars(select(models.Empleados)).all()
+    stats = {
+        "total": total_ees,
+        "riesgo_alto": high_risk,
+        "clics": 15,
+        "activos": activos
+    }
+    return templates.TemplateResponse(request, "empleados.html", {"employees": all_ees, "stats": stats, "record_count": total_ees})
 
 @app.get("/empleados/empleado_nuevo", name="empleado_nuevo")
 async def empleado_nuevo(request: Request):
@@ -152,7 +159,7 @@ async def enviar_campana(
     flash(
         request,
         f"Campaña «{nombre or 'Sin nombre'}» creada (demo). Envío pendiente.",
-        "success",
+        ".alert-success",
     )
     return RedirectResponse("/simulacion", status_code=303)
 
@@ -166,30 +173,23 @@ async def ingresar__nuevo_empleado(
     empresa: Annotated[str, Form()],
     cargo: Annotated[str, Form()] = ""
 ):
-    payload = EmpleadosCreate(
-                nombre=nombre,
-                email=email,
-                empresa=empresa,
-                cargo=cargo
-            )
-    try:
-        EmpleadosCreate.model_validate(payload)
-    except ValidationError as e:
-        flash(
-                request,
-                f"Error {e} importando empleado «{nombre or 'Sin nombre'}». Intenta nuevamente.",
-                "Error",
-            )
-        return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
+    
 
-    user = db.execute(select(models.Empleados).where(models.Empleados.email == payload.email))
-    result = user.scalars().first()
+    payload = EmpleadosCreate(
+        nombre=nombre,
+        email=email,
+        empresa=empresa,
+        cargo=cargo,
+        riesgo=100
+    )    
+
+    user = db.scalars(select(models.Empleados).where(models.Empleados.email == payload.email)).first()
         
-    if result:
+    if user:
         flash(
             request,
             f"Ya existe un empleado «{nombre or 'Sin nombre'} con correo {email}». Intenta nuevamente.",
-            "Error",
+            "error",
         )
         return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -202,7 +202,7 @@ async def ingresar__nuevo_empleado(
     flash(
         request,
         f"Empleado «{nombre or 'Failed to load EE name'}» ingresado exitosamente.",
-        "Success",
+        "success",
     )
     return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
 

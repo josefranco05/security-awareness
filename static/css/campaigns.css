@@ -1,0 +1,651 @@
+/* ============================================================
+   Campaign wizard — templates/campaigns.html
+   ============================================================ */
+
+/* `hidden` must win over the component `display` rules below. */
+[hidden] {
+    display: none !important;
+}
+
+/* ------------------------------------------------------------ Panels */
+.wizard-panel {
+    margin-bottom: 1rem;
+}
+
+.wizard-narrow {
+    max-width: 520px;
+}
+
+.wizard-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+/* Contador de paso: pastilla discreta junto a los botones. */
+.wizard-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    margin-right: auto;
+    padding: .32rem .8rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: .8rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
+.wizard-progress::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------- Form feedback */
+.req {
+    color: var(--danger);
+}
+
+.field-error {
+    margin-top: .3rem;
+    color: #f87171;
+    font-size: .82rem;
+    font-weight: 500;
+}
+
+.input-invalid {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, .18) !important;
+}
+
+.notice {
+    padding: .7rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: .85rem;
+}
+
+.notice-info {
+    background: rgba(56, 189, 248, .1);
+    border-color: rgba(56, 189, 248, .35);
+    color: var(--text-secondary);
+}
+
+.notice code {
+    color: var(--accent);
+}
+
+/* ------------------------------------------- Recipient picker (step 2) */
+
+/*  Barra de búsqueda + acciones  */
+.ee-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.ee-search-wrap {
+    position: relative;
+    flex: 1 1 260px;
+    max-width: 380px;
+}
+
+.ee-search-icon {
+    position: absolute;
+    top: 50%;
+    left: .7rem;
+    width: 17px;
+    height: 17px;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.ee-search {
+    width: 100%;
+    height: 38px;
+    padding: 0 .8rem 0 2.3rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: inherit;
+    font-size: .92rem;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.ee-search::placeholder {
+    color: var(--text-muted);
+}
+
+/* Quita la "x" nativa del navegador para que no rompa el diseño. */
+.ee-search::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.ee-search:hover {
+    border-color: #2b4564;
+}
+
+.ee-search:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.ee-toolbar-actions {
+    display: flex;
+    gap: .5rem;
+    margin-left: auto;
+}
+
+/*  Lista de empleados  */
+.ee-table {
+    --ee-cols: 22px 38px minmax(0, 1.5fr) minmax(0, 1fr) 78px 92px;
+
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.ee-head,
+.ee-item {
+    display: grid;
+    grid-template-columns: var(--ee-cols);
+    align-items: center;
+    gap: .9rem;
+    padding: .6rem 1rem;
+}
+
+.ee-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-surface-2);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+}
+
+.ee-rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.ee-item {
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    transition: background .15s ease, box-shadow .15s ease;
+}
+
+.ee-item:last-child {
+    border-bottom: none;
+}
+
+.ee-item:hover {
+    background: var(--bg-elevated);
+}
+
+.ee-item.is-selected {
+    background: rgba(47, 111, 237, .13);
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.ee-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+}
+
+.ee-item.is-selected .ee-avatar {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.ee-info,
+.ee-company {
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+    min-width: 0;
+}
+
+.ee-name {
+    font-size: .92rem;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ee-email,
+.ee-company-name,
+.ee-role {
+    font-size: .79rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ee-company-name {
+    color: var(--text-secondary);
+}
+
+.ee-role {
+    font-size: .75rem;
+}
+
+.ee-risk {
+    justify-self: start;
+    padding: .18rem .6rem;
+    border-radius: 999px;
+    font-size: .74rem;
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.ee-state {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .78rem;
+    font-weight: 600;
+}
+
+.ee-state::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    background: currentColor;
+    border-radius: 50%;
+}
+
+.ee-state.is-active {
+    color: var(--success);
+}
+
+.ee-state.is-inactive {
+    color: var(--text-muted);
+}
+
+.ee-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: .9rem;
+}
+
+/* --------------------------------------------- Template gallery (step 3) */
+.tpl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .75rem;
+}
+
+.tpl-card {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    padding: .85rem .95rem;
+    text-align: left;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.tpl-card:hover {
+    background: var(--bg-elevated);
+}
+
+.tpl-card.is-selected {
+    border-color: var(--primary);
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.tpl-from {
+    font-size: .75rem;
+    color: var(--text-muted);
+}
+
+.tpl-subject {
+    font-size: .9rem;
+    font-weight: 600;
+}
+
+.tpl-snippet {
+    font-size: .78rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+/* -------------------------------------------------- Mail composer */
+.mail-compose {
+    overflow: hidden;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.mail-meta {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    padding: .75rem 1.1rem;
+    background: var(--bg-surface-2);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.mail-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+}
+
+.mail-label {
+    min-width: 64px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: .88rem;
+    font-weight: 600;
+}
+
+.mail-row input {
+    flex: 1;
+}
+
+.mail-compose .rte-toolbar {
+    border-top: 1px solid var(--border-soft);
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+}
+
+.mail-compose .rte-editor {
+    border: none;
+    border-radius: 0;
+}
+
+/* -------------------------------------------------- Rich text editor */
+.rte-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .35rem;
+    padding: .5rem .6rem;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.rte-group {
+    display: flex;
+    align-items: center;
+    gap: .2rem;
+}
+
+.rte-sep {
+    width: 1px;
+    height: 22px;
+    margin: 0 .3rem;
+    background: var(--border);
+}
+
+.rte-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 .5rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: .82rem;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.rte-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text);
+}
+
+.rte-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.rte-u {
+    text-decoration: underline;
+}
+
+.rte-s {
+    text-decoration: line-through;
+}
+
+.rte-select {
+    width: auto;
+    min-width: 108px;
+    height: 32px;
+    padding: 0 1.7rem 0 .55rem;
+    font-size: .82rem;
+}
+
+.rte-color {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.rte-color:hover {
+    background: var(--bg-elevated);
+}
+
+.rte-color-icon {
+    font-size: .85rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text);
+    border-bottom: 3px solid currentColor;
+}
+
+.rte-color-icon-hl {
+    border-bottom-color: #fde047;
+}
+
+.rte-color input[type="color"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.rte-editor {
+    min-height: 280px;
+    padding: 1.3rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+    color: var(--text);
+    font-size: .95rem;
+    line-height: 1.6;
+    outline: none;
+    overflow-wrap: break-word;
+}
+
+.rte-editor:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.rte-editor p {
+    margin-bottom: .75rem;
+}
+
+.rte-editor img {
+    max-width: 100%;
+    height: auto;
+}
+
+.rte-editor a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.rte-editor blockquote {
+    margin: .75rem 0;
+    padding-left: .9rem;
+    border-left: 3px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.rte-source {
+    width: 100%;
+    min-height: 280px;
+    font-family: var(--mono);
+    font-size: .85rem;
+}
+
+.rte-panel {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin: .6rem;
+    padding: .75rem;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.rte-panel-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.rte-panel-row input[type="url"],
+.rte-panel-row input[type="text"] {
+    flex: 1 1 200px;
+    width: auto;
+}
+
+.rte-panel-row input[type="file"] {
+    flex: 1 1 220px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: .9rem;
+}
+
+/* ---------------------------------------------- Wizard on small screens */
+@media (max-width: 900px) {
+    /* Se oculta la columna "Empresa" junto con su encabezado. */
+    .ee-table {
+        --ee-cols: 22px 38px minmax(0, 1fr) 74px 88px;
+    }
+
+    .ee-col-company,
+    .ee-company {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .wizard-progress {
+        order: -1;
+        width: 100%;
+        margin-right: 0;
+    }
+
+    .wizard-actions .btn {
+        flex: 1 1 auto;
+    }
+
+    .ee-search-wrap {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+
+    .ee-toolbar-actions {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .ee-toolbar-actions .btn {
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 560px) {
+    /* Quedan solo: checkbox, empleado y riesgo. */
+    .ee-table {
+        --ee-cols: 22px minmax(0, 1fr) 66px;
+    }
+
+    .ee-col-avatar,
+    .ee-avatar,
+    .ee-col-state,
+    .ee-state {
+        display: none;
+    }
+
+    .ee-head,
+    .ee-item {
+        gap: .7rem;
+        padding: .6rem .75rem;
+    }
+}

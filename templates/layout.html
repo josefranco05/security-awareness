@@ -1,113 +1,121 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{% block meta_description %}Plataforma de Security Awareness para PYMEs colombianas{% endblock %}">
+    <meta name="description"
+        content="{% block meta_description %}Plataforma de Security Awareness para PYMEs colombianas{% endblock %}">
     <title>{% block title %}Security Awareness{% endblock %}</title>
 
-    
+
+    {# El query de versión evita que el navegador reutilice un style.css en caché. #}
     <link rel="stylesheet" type="text/css" href="/static/css/style.css">
 
     {% block head %}{% endblock %}
 </head>
+
 <body class="{% block body_class %}{% endblock %}">
-<div class="app">
+    <div class="app">
 
-    <!-- ===================== Navbar ===================== -->
-    <header class="navbar">
-        <div class="navbar-inner">
+        <!-- ===================== Navbar ===================== -->
+        <header class="navbar">
+            <div class="navbar-inner">
 
-            <a class="brand" href="{{ url_for('dashboard') }}">
-                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor"/>
-                    <path d="M9 12l2 2 4-4" stroke="#0a1526" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span class="brand-name">{% block brand_name %}Security Awareness{% endblock %}</span>
-                <span class="brand-tag">PYMEs</span>
-            </a>
+                <a class="brand" href="{{ url_for('dashboard') }}">
+                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true">
+                        <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor" />
+                        <path d="M9 12l2 2 4-4" stroke="#0a1526" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    <span class="brand-name">{% block brand_name %}Security Awareness{% endblock %}</span>
+                    <span class="brand-tag">PYMEs</span>
+                </a>
 
-            <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false">
-                <span></span><span></span><span></span>
-            </button>
+                <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false">
+                    <span></span><span></span><span></span>
+                </button>
 
-            <nav class="nav" id="navMenu" aria-label="Navegación principal">
-                <ul class="nav-list">
-                    <li><a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
-                           href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                    <li><a class="nav-link {% if active_page == 'deteccion' %}active{% endif %}"
-                           href="{{ url_for('deteccion') }}">Detección</a></li>
-                    <li><a class="nav-link {% if active_page == 'simulacion' %}active{% endif %}"
-                           href="{{ url_for('simulacion') }}">Simulación</a></li>
-                    <li><a class="nav-link {% if active_page == 'empleados' %}active{% endif %}"
-                           href="{{ url_for('empleados') }}">Empleados</a></li>
-                </ul>
-            </nav>
+                <nav class="nav" id="navMenu" aria-label="Navegación principal">
+                    <ul class="nav-list">
+                        <li><a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+                                href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                        <li><a class="nav-link {% if active_page == 'deteccion' %}active{% endif %}"
+                                href="{{ url_for('deteccion') }}">Detección</a></li>
+                        <li><a class="nav-link {% if active_page == 'simulacion' %}active{% endif %}"
+                                href="{{ url_for('simulacion') }}">Simulación</a></li>
+                        <li><a class="nav-link {% if active_page == 'empleados' %}active{% endif %}"
+                                href="{{ url_for('empleados') }}">Empleados</a></li>
+                    </ul>
+                </nav>
 
-            <div class="navbar-end">
-                {% block navbar_end %}
+                <div class="navbar-end">
+                    {% block navbar_end %}
                     {# Zona de sesión. Sobrescríbela cuando tengas login:
-                       <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Iniciar sesión</a>
-                       o muestra el usuario actual + logout. #}
                     <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Iniciar sesión</a>
-                {% endblock %}
-            </div>
-
-        </div>
-    </header>
-
-    <!-- ===================== Flash messages ===================== -->
-    {% block flash %}
-        {# Requiere un helper get_flashed_messages() (estilo Flask).
-           Si no lo usas, sobrescribe este bloque o déjalo vacío. #}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-stack">
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category or 'info' }}" role="alert">
-                            <span class="alert-text">{{ message }}</span>
-                            <button type="button" class="alert-close" data-dismiss="alert" aria-label="Cerrar">&times;</button>
-                        </div>
-                    {% endfor %}
+                    o muestra el usuario actual + logout. #}
+                    <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Iniciar sesión</a>
+                    {% endblock %}
                 </div>
-            {% endif %}
-        {% endwith %}
-    {% endblock %}
 
-    <!-- ===================== Contenido ===================== -->
-    <main class="main">
-        {% block content %}{% endblock %}
-    </main>
+            </div>
+        </header>
 
-    <!-- ===================== Footer ===================== -->
-    <footer class="footer">
-        <div class="footer-inner">
-            <span>{% block footer_text %}Security Awareness &mdash; Plataforma para PYMEs colombianas{% endblock %}</span>
-            <span>{% block footer_extra %}{% endblock %}</span>
+        <!-- ===================== Flash messages ===================== -->
+        {% block flash %}
+        {# Requiere un helper get_flashed_messages() (estilo Flask).
+        Si no lo usas, sobrescribe este bloque o déjalo vacío. #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-stack">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category or 'info' }}" role="alert">
+                <span class="alert-text">{{ message }}</span>
+                <button type="button" class="alert-close" data-dismiss="alert" aria-label="Cerrar">&times;</button>
+            </div>
+            {% endfor %}
         </div>
-    </footer>
+        {% endif %}
+        {% endwith %}
+        {% endblock %}
 
-</div>
+        <!-- ===================== Contenido ===================== -->
+        <main class="main">
+            {% block content %}{% endblock %}
+        </main>
 
-<script>
-    // Toggle de menú en móvil
-    (function () {
-        var toggle = document.getElementById('navToggle');
-        var menu = document.getElementById('navMenu');
-        if (!toggle || !menu) return;
-        toggle.addEventListener('click', function () {
-            var open = menu.classList.toggle('open');
-            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        <!-- ===================== Footer ===================== -->
+        <footer class="footer">
+            <div class="footer-inner">
+                <span>{% block footer_text %}Security Awareness &mdash; Plataforma para PYMEs colombianas{% endblock
+                    %}</span>
+                <span>{% block footer_extra %}{% endblock %}</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        // Toggle de menú en móvil
+        (function () {
+            var toggle = document.getElementById('navToggle');
+            var menu = document.getElementById('navMenu');
+            if (!toggle || !menu) return;
+            toggle.addEventListener('click', function () {
+                var open = menu.classList.toggle('open');
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+        })();
+
+        // Cerrar alertas (flash messages)
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-dismiss="alert"]');
+            if (btn && btn.parentElement) btn.parentElement.remove();
         });
-    })();
+    </script>
 
-    // Cerrar alertas (flash messages)
-    document.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-dismiss="alert"]');
-        if (btn && btn.parentElement) btn.parentElement.remove();
-    });
-</script>
-
-{% block scripts %}{% endblock %}
+    {% block scripts %}{% endblock %}
 </body>
+
 </html>

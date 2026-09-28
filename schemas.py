@@ -34,10 +34,11 @@ class EmpleadosBase(BaseModel):
     nombre: str
     email: EmailStr
     empresa: str = Field(min_length=1)
+    riesgo: int
     cargo: str | None
 
 class EmpleadosCreate(EmpleadosBase):
-    pass
+    estado: bool = True
 
 class EmpleadosResponse(EmpleadosBase):
     model_config = ConfigDict(from_attributes=True)
@@ -46,17 +47,17 @@ class EmpleadosResponse(EmpleadosBase):
 
 
 class SimulacionBase(BaseModel):
-    campana: str = Field(min_length=1, max_length=50)
+    campana_id: int
     status: str = Field(min_length=1, max_length=20)
     fecha_envio: datetime
 
 class SimulacionCreate(SimulacionBase):
-    user_id: int # TEMPORAL
+    ee_id: int # TEMPORAL
 
 class SimulacionResponse(SimulacionBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: int
-    fecha_respuesta: datetime
+    ee_id: int
+    fecha_respuesta: datetime | None
     aprobado: bool
