@@ -103,9 +103,16 @@ async def deteccion(request: Request):
     return templates.TemplateResponse(request, "deteccion.html", {})
 
 
-@app.get("/simulacion", name="simulacion")
-async def simulacion(request: Request):
-    return templates.TemplateResponse(request, "campaigns.html", {})
+@app.get(
+        "/simulacion", 
+        name="simulacion", 
+        include_in_schema=False
+        )
+async def simulacion(request: Request, db: Annotated[Session, Depends(get_db)]):
+    empleados = db.scalars(
+        select(models.Empleados)
+    ).all()
+    return templates.TemplateResponse(request, "campaigns.html", {"employees": empleados})
 
 
 @app.get("/empleados", name="empleados", include_in_schema=False)
@@ -117,38 +124,39 @@ async def empleados(
     total_ees = db.scalar(select(func.count()).select_from(models.Empleados))
     high_risk = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.riesgo >= 70))
     activos = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.estado == True))
-        
+    inactivos = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.estado == False))
+    
     all_ees = db.scalars(select(models.Empleados)).all()
     stats = {
         "total": total_ees,
         "riesgo_alto": high_risk,
-        "clics": 15,
-        "activos": activos
+        "activos": activos,
+        "inactivos": inactivos
     }
     return templates.TemplateResponse(request, "empleados.html", {"employees": all_ees, "stats": stats, "record_count": total_ees})
 
-@app.get("/empleados/empleado_nuevo", name="empleado_nuevo")
+@app.get("/empleados/empleado_nuevo", name="empleado_nuevo", include_in_schema=False)
 async def empleado_nuevo(request: Request):
     return templates.TemplateResponse(request, "empleado_nuevo.html", {})
 
 
-@app.get("/recuperar-contrasena", name="forgot_password")
+@app.get("/recuperar-contrasena", name="forgot_password", include_in_schema=False)
 async def forgot_password(request: Request):
     pass
 
 
-@app.get("/login", name="login")
+@app.get("/login", name="login", include_in_schema=False)
 async def login_form(request: Request):
     return templates.TemplateResponse(request, "login.html", {})
 
 
-@app.post("/login")
+@app.post("/login", include_in_schema=False)
 async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
     flash(request, f"Sesión iniciada como «{username}» (demo).", "success")
     return RedirectResponse("/", status_code=303)
 
 
-@app.post("/enviar-campana", name="enviar_campana")
+@app.post("/enviar-campana", name="enviar_campana", include_in_schema=False)
 async def enviar_campana(
     request: Request,
     nombre: str = Form(),
@@ -164,7 +172,11 @@ async def enviar_campana(
     return RedirectResponse("/simulacion", status_code=303)
 
 
-@app.post("/empleado-nuevo", name="empleado_manual")
+@app.post(
+        "/empleado-nuevo", 
+        name="empleado_manual", 
+        include_in_schema=False
+        )
 async def ingresar__nuevo_empleado(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
@@ -173,17 +185,17 @@ async def ingresar__nuevo_empleado(
     empresa: Annotated[str, Form()],
     cargo: Annotated[str, Form()] = ""
 ):
-    
-
     payload = EmpleadosCreate(
         nombre=nombre,
         email=email,
         empresa=empresa,
         cargo=cargo,
         riesgo=100
-    )    
+    )
 
-    user = db.scalars(select(models.Empleados).where(models.Empleados.email == payload.email)).first()
+    user = db.scalars(
+        select(models.Empleados).where(models.Empleados.email == payload.email)
+        ).first()
         
     if user:
         flash(
@@ -191,20 +203,20 @@ async def ingresar__nuevo_empleado(
             f"Ya existe un empleado «{nombre or 'Sin nombre'} con correo {email}». Intenta nuevamente.",
             "error",
         )
-        return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse("/empleados", status_code=status.HTTP_201_CREATED)
 
-    entry = models.Empleados(**payload.model_dump())
+    nuevo_emp = models.Empleados(**payload.model_dump())
 
-    db.add(entry)
+    db.add(nuevo_emp)
     db.commit()
-    db.refresh(entry)
+    db.refresh(nuevo_emp)
     
     flash(
         request,
-        f"Empleado «{nombre or 'Failed to load EE name'}» ingresado exitosamente.",
+        f"Empleado «{nuevo_emp.nombre or 'Failed to load EE name'}» ingresado exitosamente.",
         "success",
     )
-    return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/empleados", status_code=status.HTTP_201_CREATED)
 
 
 @app.post("/empleado-importar", name="empleado_importar")
