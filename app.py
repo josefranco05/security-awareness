@@ -13,7 +13,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from typing import Optional, Annotated
-from datetime import datetime
+from datetime import datetime, UTC
 
 from pydantic import ValidationError
 
@@ -28,9 +28,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy import select, func, ScalarResult
 from sqlalchemy.orm import Session
 
-from schemas import SimulacionCreate, SimulacionResponse, EmpleadosCreate, EmpleadosResponse
+from schemas import CampañaCreate, CampañaResponse, SimulacionCreate, SimulacionResponse, EmpleadosCreate, EmpleadosResponse, UserCreate, UserResponse 
 import models
 from database import Base, engine, get_db 
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -97,6 +98,36 @@ async def dashboard(request: Request):
         {"stats": stats}
     )
 
+@app.post(
+        "/api/nuevousuario",
+        response_model=UserResponse,
+        status_code=status.HTTP_201_CREATED
+)
+async def crear_usuario(
+    user: UserCreate,
+    db: Annotated[Session, Depends(get_db)]
+):
+    existing_user = db.scalars(
+        select(models.User).where(models.User.username == user.username)
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El usuario con username {user.username} ya existe."
+        )
+
+    nuevo_usuario = models.User(
+        username=user.username,
+        email=user.email
+    )
+
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+
+    return nuevo_usuario
+
 
 @app.get("/deteccion", name="deteccion")
 async def deteccion(request: Request):
@@ -110,7 +141,7 @@ async def deteccion(request: Request):
         )
 async def simulacion(request: Request, db: Annotated[Session, Depends(get_db)]):
     empleados = db.scalars(
-        select(models.Empleados)
+        select(models.Empleados).where(models.Empleados.estado == True)
     ).all()
     return templates.TemplateResponse(request, "campaigns.html", {"employees": empleados})
 
@@ -121,10 +152,24 @@ async def empleados(
     db: Annotated[Session, Depends(get_db)]
     ):
 
-    total_ees = db.scalar(select(func.count()).select_from(models.Empleados))
-    high_risk = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.riesgo >= 70))
-    activos = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.estado == True))
-    inactivos = db.scalar(select(func.count()).select_from(models.Empleados).where(models.Empleados.estado == False))
+    total_ees = db.scalar(
+        select(func.count()).select_from(models.Empleados)
+        )
+    high_risk = db.scalar(
+        select(func.count())
+        .select_from(models.Empleados)
+        .where(models.Empleados.riesgo >= 70)
+        )
+    activos = db.scalar(
+        select(func.count())
+        .select_from(models.Empleados)
+        .where(models.Empleados.estado == True)
+        )
+    inactivos = db.scalar(
+        select(func.count())
+        .select_from(models.Empleados)
+        .where(models.Empleados.estado == False)
+        )
     
     all_ees = db.scalars(select(models.Empleados)).all()
     stats = {
@@ -159,17 +204,99 @@ async def login_submit(request: Request, username: str = Form(...), password: st
 @app.post("/enviar-campana", name="enviar_campana", include_in_schema=False)
 async def enviar_campana(
     request: Request,
-    nombre: str = Form(),
-    remitente: str = Form(),
-    asunto: str = Form(),
-    cuerpo: str = Form(),
+    db: Annotated[Session, Depends(get_db)],
+    campnombre: Annotated[str, Form()],
+    remitente: Annotated[str, Form()],
+    asunto: Annotated[str, Form()],
+    cuerpo: Annotated[str, Form()],
+    destinatarios: Annotated[list[str], Form()] = [],
 ):
+    emails = list(dict.fromkeys(email.strip() for email in destinatarios))
+    if not emails:
+        flash(
+            request,
+            "Debes selecctionar al menos un empleado.",
+            "error",
+        )
+        return RedirectResponse("/simulacion", status_code=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        nueva_campaña = CampañaCreate(
+            nombre=campnombre.strip(),
+            fecha=datetime.now(UTC),
+            remitente=remitente.strip(),
+            asunto=asunto.strip(),
+            cuerpo=cuerpo,
+        )
+    except ValidationError as exception:
+        flash(
+            request,
+            f"La campaña {campnombre} no puedo iniciarse debido a que los datos no son validos, error: {exception}. Intenta nuevamente",
+            "error",
+        )
+        return RedirectResponse("/simulacion", status_code=status.HTTP_400_BAD_REQUEST)
+
+    current_user_id = 1
+
+    try:
+        target_empleados = db.scalars(
+                select(models.Empleados)
+                .where(models.Empleados.email.in_(emails),
+                       models.Empleados.estado.is_(True))
+            ).all()
+        
+        emails_encontrados = {empleado.email for empleado in target_empleados}
+        if emails_encontrados != set(emails):
+            flash(
+                request,
+                "Uno o mas destinatarios no existen o estan inactivos.",
+                "error",
+            )
+            return RedirectResponse("/simulacion", status_code=status.HTTP_400_BAD_REQUEST)
+
+        n_campaña = models.Campaña(
+            owner=current_user_id,
+            **nueva_campaña.model_dump(),
+        )
+
+        db.add(n_campaña)
+        db.flush()
+
+        simulaciones = [
+            SimulacionCreate(
+                campana_id=n_campaña.camid,
+                ee_id=_.eeid,
+                status="pending",
+                fecha_envio=datetime.now(UTC)
+            )
+            for _ in target_empleados
+        ]
+
+        db.add_all(models.Simulaciones(
+            **simulacion.model_dump()) for simulacion in simulaciones
+            )
+
+        db.commit()
+
+    except ValidationError as exception:
+        db.rollback()
+        flash(
+            request,
+            f"Los datos de las simulaciones no son validos. Error: {exception}.",
+            "error",
+        )
+        return RedirectResponse("/simulacion", status_code=status.HTTP_400_BAD_REQUEST)
+
+    except Exception:
+        db.rollback()
+        raise
+
     flash(
         request,
-        f"Campaña «{nombre or 'Sin nombre'}» creada (demo). Envío pendiente.",
-        ".alert-success",
+        f"Campaña «{campnombre or 'Sin nombre'}» creada correctamente. Envío en proceso, puedes revisar el avance en la pestaña 'Campañas'.",
+        "success",
     )
-    return RedirectResponse("/simulacion", status_code=303)
+    return RedirectResponse("/simulacion", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post(
@@ -203,7 +330,7 @@ async def ingresar__nuevo_empleado(
             f"Ya existe un empleado «{nombre or 'Sin nombre'} con correo {email}». Intenta nuevamente.",
             "error",
         )
-        return RedirectResponse("/empleados", status_code=status.HTTP_201_CREATED)
+        return RedirectResponse("/empleados", status_code=status.HTTP_400_BAD_REQUEST)
 
     nuevo_emp = models.Empleados(**payload.model_dump())
 
@@ -216,7 +343,7 @@ async def ingresar__nuevo_empleado(
         f"Empleado «{nuevo_emp.nombre or 'Failed to load EE name'}» ingresado exitosamente.",
         "success",
     )
-    return RedirectResponse("/empleados", status_code=status.HTTP_201_CREATED)
+    return RedirectResponse("/empleados", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.post("/empleado-importar", name="empleado_importar")
