@@ -17,12 +17,14 @@ class UserResponse(UserBase):
 
 
 class CampañaBase(BaseModel):
-    nombre: str = Field(max_length=100)
+    nombre: str = Field(min_length=1, max_length=100)
     fecha: datetime
 
 
 class CampañaCreate(CampañaBase):
-    pass
+    remitente: str
+    asunto: str
+    cuerpo: str
 
 class CampañaResponse(CampañaBase):
     model_config = ConfigDict(from_attributes=True)
