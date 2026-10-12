@@ -10,7 +10,7 @@
 
 
     {# El query de versión evita que el navegador reutilice un style.css en caché. #}
-    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css?v=5">
 
     {% block head %}{% endblock %}
 </head>
@@ -45,6 +45,8 @@
                                 href="{{ url_for('deteccion') }}">Detección</a></li>
                         <li><a class="nav-link {% if active_page == 'simulacion' %}active{% endif %}"
                                 href="{{ url_for('simulacion') }}">Simulación</a></li>
+                        <li><a class="nav-link {% if active_page == 'campanas' %}active{% endif %}"
+                                href="{{ url_for('campañas') }}">Campañas</a></li>
                         <li><a class="nav-link {% if active_page == 'empleados' %}active{% endif %}"
                                 href="{{ url_for('empleados') }}">Empleados</a></li>
                     </ul>
@@ -114,6 +116,8 @@
             if (btn && btn.parentElement) btn.parentElement.remove();
         });
     </script>
+
+    <script src="{{ url_for('static', path='js/utils.js') }}"></script>
 
     {% block scripts %}{% endblock %}
 </body>

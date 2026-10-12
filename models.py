@@ -55,7 +55,7 @@ class Simulaciones(Base):
     ee_id: Mapped[int] = mapped_column(ForeignKey("empleados.eeid"), nullable=False, index=True)
     fecha_envio: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     fecha_respuesta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
-    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     aprobado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     empleados: Mapped[Empleados] = relationship("Empleados", back_populates="simulaciones")

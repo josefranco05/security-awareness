@@ -15,13 +15,20 @@
 {% endif %}
 {%- endmacro %}
 
+{# Rutas que debe exponer el backend:
+POST /empleado-nuevo name="empleado_manual" (ya existe)
+POST /empleado-importar name="empleado_importar" (ya existe)
+POST /empleado-actualizar/{eeid} name="empleado_actualizar"
+POST /empleado-eliminar/{eeid} name="empleado_eliminar"
+Todas responden con redirect 303 a /empleados. #}
+
 {% block content %}
 <div class="flex-between mb-3">
     <div>
         <h1>Empleados</h1>
         <p class="text-muted">Personal registrado y su nivel de riesgo frente al phishing</p>
     </div>
-    <a class="btn btn-primary" href='{{ url_for("empleado_nuevo") }}'>+ Agregar empleado</a>
+    <button type="button" class="btn btn-primary" data-modal-open="modalEmpleadoNuevo">+ Agregar empleado</button>
 </div>
 
 <!-- ===================== KPIs ===================== -->
@@ -52,7 +59,7 @@
     </div>
 
     <div class="table-wrap">
-        <table class="table">
+        <table class="table" id="tablaEmpleados">
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -61,6 +68,7 @@
                     <th>Riesgo</th>
                     <th>Clics</th>
                     <th>Estado</th>
+                    <th class="text-right">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -78,14 +86,220 @@
                         <span class="badge badge-neutral">Inactivo</span>
                         {% endif %}
                     </td>
+                    <td>
+                        <div class="row-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" data-action="editar"
+                                data-ee-id="{{ employee.eeid }}" data-ee-nombre="{{ employee.nombre }}"
+                                data-ee-email="{{ employee.email }}" data-ee-empresa="{{ employee.empresa }}"
+                                data-ee-cargo="{{ employee.cargo or '' }}" data-ee-riesgo="{{ employee.riesgo }}"
+                                data-ee-estado="{{ 'true' if employee.estado else 'false' }}">Editar</button>
+                            <button type="button" class="btn btn-ghost-danger btn-sm" data-action="eliminar"
+                                data-ee-id="{{ employee.eeid }}"
+                                data-ee-nombre="{{ employee.nombre }}">Eliminar</button>
+                        </div>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted">Aún no hay empleados registrados.</td>
+                    <td colspan="7" class="text-center text-muted">Aún no hay empleados registrados.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- ===================== Modal: agregar empleado ===================== -->
+<div class="modal" id="modalEmpleadoNuevo" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tituloEmpleadoNuevo">
+        <div class="modal-header">
+            <div>
+                <h2 class="card-title" id="tituloEmpleadoNuevo">Agregar empleado</h2>
+                <p class="card-subtitle">Registra un empleado manualmente o importa varios desde un CSV</p>
+            </div>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+
+        <div data-tabs>
+            <div class="tabs" role="tablist">
+                <button type="button" class="tab active" data-tab="manual" role="tab"
+                    aria-selected="true">Manual</button>
+                <button type="button" class="tab" data-tab="csv" role="tab" aria-selected="false">Importar CSV</button>
+            </div>
+
+            <div data-tab-panel="manual">
+                {# Campos: nombre, email, empresa, cargo #}
+                <form method="post" id="formAgregar" action="">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="nuevo-nombre">Nombre completo</label>
+                            <input type="text" id="nuevo-nombre" name="nombre" placeholder="Ej. Ana Pérez" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nuevo-email">Email</label>
+                            <input type="email" id="nuevo-email" name="email" placeholder="ana@empresa.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nuevo-empresa">Empresa</label>
+                            <input type="text" id="nuevo-empresa" name="empresa" placeholder="Ej. Mi PYME S.A.S."
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nuevo-cargo">Cargo <span class="text-muted">(opcional)</span></label>
+                            <input type="text" id="nuevo-cargo" name="cargo" placeholder="Ej. Contadora">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar empleado</button>
+                    </div>
+                </form>
+            </div>
+
+            <div data-tab-panel="csv" hidden>
+                {# POST multipart; campo del archivo: 'archivo' #}
+                <form method="post" id="formImportar" action="" enctype="multipart/form-data">
+                    <div class="form-group mb-2">
+                        <label for="nuevo-csv">Archivo CSV</label>
+                        <input type="file" id="nuevo-csv" name="archivo" accept=".csv,text/csv" required>
+                    </div>
+                    <p class="form-hint mb-2">
+                        Columnas esperadas: <code>nombre, email, empresa, cargo</code> (cargo opcional).
+                        La primera fila debe contener los encabezados.
+                    </p>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Importar CSV</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== Modal: editar empleado ===================== -->
+<div class="modal" id="modalEmpleadoEditar" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="tituloEmpleadoEditar">
+        <div class="modal-header">
+            <div>
+                <h2 class="card-title" id="tituloEmpleadoEditar">Editar empleado</h2>
+                <p class="card-subtitle" id="editar-subtitulo"></p>
+            </div>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+
+        <form method="post" id="formEditar" action="">
+            <input type="hidden" name="eeid" id="editar-eeid">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="editar-nombre">Nombre completo</label>
+                    <input type="text" id="editar-nombre" name="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label for="editar-email">Email</label>
+                    <input type="email" id="editar-email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="editar-empresa">Empresa</label>
+                    <input type="text" id="editar-empresa" name="empresa" required>
+                </div>
+                <div class="form-group">
+                    <label for="editar-cargo">Cargo <span class="text-muted">(opcional)</span></label>
+                    <input type="text" id="editar-cargo" name="cargo">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===================== Modal: eliminar empleado ===================== -->
+<div class="modal" id="modalEmpleadoEliminar" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="tituloEmpleadoEliminar">
+        <div class="modal-header">
+            <h2 class="card-title" id="tituloEmpleadoEliminar">Eliminar empleado</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+
+        <p class="text-secondary">
+            ¿Eliminar a <strong id="eliminar-nombre"></strong>? Esta acción no se puede deshacer.
+        </p>
+
+        <form method="post" id="formEliminar" action="">
+            <input type="hidden" name="eeid" id="eliminar-eeid">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+                <button type="submit" class="btn btn-danger">Eliminar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        "use strict";
+
+        var URL_ACTUALIZAR = "/empleado-actualizar/";
+        var URL_ELIMINAR = "/empleado-eliminar/";
+
+        var formEditar = document.getElementById("formEditar");
+        var formEliminar = document.getElementById("formEliminar");
+        var tabla = document.getElementById("tablaEmpleados");
+
+        function setValue(id, value) {
+            var field = document.getElementById(id);
+            if (field) field.value = value == null ? "" : value;
+        }
+
+        function abrirEdicion(data) {
+            setValue("editar-eeid", data.eeId);
+            setValue("editar-nombre", data.eeNombre);
+            setValue("editar-email", data.eeEmail);
+            setValue("editar-empresa", data.eeEmpresa);
+            setValue("editar-cargo", data.eeCargo);
+            setValue("editar-riesgo", data.eeRiesgo);
+            setValue("editar-estado", data.eeEstado);
+
+            document.getElementById("editar-subtitulo").textContent = data.eeEmail || "";
+            formEditar.action = URL_ACTUALIZAR + data.eeId;
+
+            showModal("modalEmpleadoEditar");
+        }
+
+        function abrirEliminacion(data) {
+            setValue("eliminar-eeid", data.eeId);
+            document.getElementById("eliminar-nombre").textContent = data.eeNombre || "este empleado";
+            formEliminar.action = URL_ELIMINAR + data.eeId;
+
+            showModal("modalEmpleadoEliminar");
+        }
+
+        if (tabla) {
+            tabla.addEventListener("click", function (event) {
+                var boton = event.target.closest("[data-action]");
+                if (!boton) return;
+
+                var data = boton.dataset;
+
+                if (data.action === "editar") {
+                    abrirEdicion(data);
+                } else if (data.action === "eliminar") {
+                    abrirEliminacion(data);
+                }
+            });
+        }
+
+        if (window.location.hash === "#nuevo") {
+            showModal("modalEmpleadoNuevo");
+        }
+    })();
+</script>
 {% endblock %}
