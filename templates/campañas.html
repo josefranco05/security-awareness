@@ -4,36 +4,6 @@
 
 {% block title %}Campañas · Security Awareness{% endblock %}
 
-{# ----------------------------------------------------------------------------
-   Vista de campañas y simulaciones.
-
-   Ruta sugerida (main.py):
-       GET  /campanas   name="campanas"   -> "campañas.html"
-       POST /campanas   (mismo path)      -> activar y enviar pendientes
-   El formulario de activación usa action="" para postear a esta misma URL;
-   recibe los campos: accion="activar" y campana_id.
-
-   Variables que debe pasar la ruta (o dejar los ejemplos de abajo):
-
-     campanas: [
-       {"camid": int, "nombre": str, "fecha": datetime}
-     ]
-
-     simulaciones: [
-       {"id": int,
-        "campana_id": int,
-        "campana_nombre": str,
-        "campana_fecha": datetime,
-        "empleado_nombre": str,
-        "empleado_email": str,
-        "fecha_envio": datetime | None,
-        "fecha_respuesta": datetime | None,     # vacío = sin completar
-        "status": "pending"|"sent"|"opened"|"clicked"|"completed",
-        "aprobado": bool,
-        "reportado": bool}                      # opcional, por defecto = aprobado
-     ]
-   ---------------------------------------------------------------------------- #}
-
 {% macro fecha(valor, formato='%d/%m/%Y') -%}
 {%- if not valor -%}
 {%- elif valor.strftime is defined -%}{{ valor.strftime(formato) }}
@@ -43,54 +13,22 @@
 
 {% macro estado_badge(status) -%}
 {%- set mapa = {
-    'pending':   ('badge-neutral', 'Pendiente'),
-    'sent':      ('badge-blue',    'Enviado'),
-    'opened':    ('badge-cyan',    'Abierto'),
-    'clicked':   ('badge-amber',   'Clic'),
-    'completed': ('badge-green',   'Completado')
+'pending': ('badge-neutral', 'Pendiente'),
+'sending': ('badge-cyan', 'Enviando'),
+'sent': ('badge-blue', 'Enviado'),
+'failed': ('badge-red', 'Fallido'),
+'opened': ('badge-cyan', 'Abierto'),
+'clicked': ('badge-amber', 'Clic'),
+'completed': ('badge-green', 'Completado')
 } -%}
 {%- set clase, texto = mapa.get(status, ('badge-neutral', status or 'Sin estado')) -%}
 <span class="badge {{ clase }}">{{ texto }}</span>
 {%- endmacro %}
 
-{# TODO: eliminar los ejemplos cuando la ruta pase `campanas` y `simulaciones`. #}
-{% set campanas_demo = [
-    {'camid': 1, 'nombre': 'Simulacro trimestral Q1', 'fecha': '2025-02-10'},
-    {'camid': 2, 'nombre': 'Facturas falsas - contabilidad', 'fecha': '2025-04-22'}
-] %}
-
-{% set simulaciones_demo = [
-    {'id': 1, 'campana_id': 1, 'campana_nombre': 'Simulacro trimestral Q1', 'campana_fecha': '2025-02-10',
-     'empleado_nombre': 'Ana Pérez', 'empleado_email': 'ana.perez@mipyme.com.co',
-     'fecha_envio': '2025-02-10', 'fecha_respuesta': '2025-02-10', 'status': 'completed', 'aprobado': true},
-    {'id': 2, 'campana_id': 1, 'campana_nombre': 'Simulacro trimestral Q1', 'campana_fecha': '2025-02-10',
-     'empleado_nombre': 'Carlos Ramírez', 'empleado_email': 'carlos.ramirez@mipyme.com.co',
-     'fecha_envio': '2025-02-10', 'fecha_respuesta': '2025-02-11', 'status': 'completed', 'aprobado': false},
-    {'id': 3, 'campana_id': 1, 'campana_nombre': 'Simulacro trimestral Q1', 'campana_fecha': '2025-02-10',
-     'empleado_nombre': 'Diana Gómez', 'empleado_email': 'diana.gomez@mipyme.com.co',
-     'fecha_envio': '2025-02-10', 'fecha_respuesta': None, 'status': 'clicked', 'aprobado': false},
-    {'id': 4, 'campana_id': 1, 'campana_nombre': 'Simulacro trimestral Q1', 'campana_fecha': '2025-02-10',
-     'empleado_nombre': 'Julián Mora', 'empleado_email': 'julian.mora@mipyme.com.co',
-     'fecha_envio': '2025-02-10', 'fecha_respuesta': None, 'status': 'sent', 'aprobado': false},
-    {'id': 5, 'campana_id': 1, 'campana_nombre': 'Simulacro trimestral Q1', 'campana_fecha': '2025-02-10',
-     'empleado_nombre': 'Laura Restrepo', 'empleado_email': 'laura.restrepo@mipyme.com.co',
-     'fecha_envio': None, 'fecha_respuesta': None, 'status': 'pending', 'aprobado': false},
-    {'id': 6, 'campana_id': 2, 'campana_nombre': 'Facturas falsas - contabilidad', 'campana_fecha': '2025-04-22',
-     'empleado_nombre': 'Ana Pérez', 'empleado_email': 'ana.perez@mipyme.com.co',
-     'fecha_envio': '2025-04-22', 'fecha_respuesta': '2025-04-22', 'status': 'completed', 'aprobado': true},
-    {'id': 7, 'campana_id': 2, 'campana_nombre': 'Facturas falsas - contabilidad', 'campana_fecha': '2025-04-22',
-     'empleado_nombre': 'Diana Gómez', 'empleado_email': 'diana.gomez@mipyme.com.co',
-     'fecha_envio': '2025-04-22', 'fecha_respuesta': None, 'status': 'opened', 'aprobado': false},
-    {'id': 8, 'campana_id': 2, 'campana_nombre': 'Facturas falsas - contabilidad', 'campana_fecha': '2025-04-22',
-     'empleado_nombre': 'Andrés Cifuentes', 'empleado_email': 'andres.cifuentes@mipyme.com.co',
-     'fecha_envio': None, 'fecha_respuesta': None, 'status': 'pending', 'aprobado': false}
-] %}
-
 {% set campanas_src = campanas | default([], true) %}
 {% set simulaciones_src = simulaciones | default([], true) %}
-{% set usando_demo = (campanas_src | length) == 0 and (simulaciones_src | length) == 0 %}
-{% set campanas = campanas_src if not usando_demo else campanas_demo %}
-{% set simulaciones = simulaciones_src if not usando_demo else simulaciones_demo %}
+{% set campanas = campanas_src %}
+{% set simulaciones = simulaciones_src %}
 
 
 {% block content %}
@@ -99,12 +37,8 @@
         <h1>Campañas</h1>
         <p class="text-muted">Resultados de las simulaciones de phishing enviadas a tus empleados</p>
     </div>
-    {% if usando_demo %}
-    <span class="badge badge-amber">Datos de ejemplo</span>
-    {% endif %}
 </div>
 
-<!-- ===================== Filtros ===================== -->
 <div class="card mb-3">
     <div class="filters">
         <div class="form-group">
@@ -117,12 +51,68 @@
             </select>
         </div>
         <div class="form-group">
-            <label for="filtroDesde">Fecha desde</label>
-            <input type="date" id="filtroDesde">
+            <label for="filtroDesdeTrigger">Fecha desde</label>
+            <div class="date-picker" data-date-picker>
+                <input type="hidden" id="filtroDesde">
+                <button type="button" class="date-picker-trigger" id="filtroDesdeTrigger" aria-haspopup="dialog"
+                    aria-expanded="false" aria-controls="calendarioDesde">
+                    <span data-date-label>Seleccionar fecha</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3.5" y="5" width="17" height="16" rx="2" fill="none" stroke="currentColor"
+                            stroke-width="1.7"></rect>
+                        <path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17" fill="none" stroke="currentColor" stroke-width="1.7"
+                            stroke-linecap="round"></path>
+                    </svg>
+                </button>
+                <div class="date-picker-popover" id="calendarioDesde" role="dialog" aria-label="Calendario fecha desde"
+                    hidden>
+                    <div class="date-picker-header">
+                        <button type="button" data-calendar-prev aria-label="Mes anterior">&lsaquo;</button>
+                        <strong data-calendar-title></strong>
+                        <button type="button" data-calendar-next aria-label="Mes siguiente">&rsaquo;</button>
+                    </div>
+                    <div class="date-picker-weekdays" aria-hidden="true">
+                        <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                    </div>
+                    <div class="date-picker-days" data-calendar-days role="grid"></div>
+                    <div class="date-picker-footer">
+                        <span data-calendar-selection>Sin fecha seleccionada</span>
+                        <button type="button" data-calendar-clear>Limpiar</button>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="form-group">
-            <label for="filtroHasta">Fecha hasta</label>
-            <input type="date" id="filtroHasta">
+            <label for="filtroHastaTrigger">Fecha hasta</label>
+            <div class="date-picker" data-date-picker>
+                <input type="hidden" id="filtroHasta">
+                <button type="button" class="date-picker-trigger" id="filtroHastaTrigger" aria-haspopup="dialog"
+                    aria-expanded="false" aria-controls="calendarioHasta">
+                    <span data-date-label>Seleccionar fecha</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3.5" y="5" width="17" height="16" rx="2" fill="none" stroke="currentColor"
+                            stroke-width="1.7"></rect>
+                        <path d="M7.5 3.5v3M16.5 3.5v3M3.5 9.5h17" fill="none" stroke="currentColor" stroke-width="1.7"
+                            stroke-linecap="round"></path>
+                    </svg>
+                </button>
+                <div class="date-picker-popover" id="calendarioHasta" role="dialog" aria-label="Calendario fecha hasta"
+                    hidden>
+                    <div class="date-picker-header">
+                        <button type="button" data-calendar-prev aria-label="Mes anterior">&lsaquo;</button>
+                        <strong data-calendar-title></strong>
+                        <button type="button" data-calendar-next aria-label="Mes siguiente">&rsaquo;</button>
+                    </div>
+                    <div class="date-picker-weekdays" aria-hidden="true">
+                        <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                    </div>
+                    <div class="date-picker-days" data-calendar-days role="grid"></div>
+                    <div class="date-picker-footer">
+                        <span data-calendar-selection>Sin fecha seleccionada</span>
+                        <button type="button" data-calendar-clear>Limpiar</button>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="filters-actions">
             <button type="button" class="btn btn-secondary" id="btnLimpiarFiltros">Limpiar</button>
@@ -130,7 +120,6 @@
     </div>
 </div>
 
-<!-- ===================== KPIs ===================== -->
 <div class="stat-grid mb-3">
     <div class="stat-card">
         <div class="stat-label">Simulaciones</div>
@@ -153,10 +142,6 @@
         <div class="stat-value" data-kpi="fallidas">0</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Reportados</div>
-        <div class="stat-value" data-kpi="reportados">0</div>
-    </div>
-    <div class="stat-card">
         <div class="stat-label">Pixel abierto</div>
         <div class="stat-value" data-kpi="abiertos">0</div>
     </div>
@@ -166,7 +151,6 @@
     </div>
 </div>
 
-<!-- ===================== Progreso por campaña ===================== -->
 <div class="card mb-3">
     <div class="card-header">
         <h2 class="card-title">Progreso por campaña</h2>
@@ -184,14 +168,13 @@
                     </p>
                 </div>
                 <div class="campaign-pct">
-                    <span class="campaign-pct-value" data-stat="pct">0</span><span
-                        class="campaign-pct-sign">%</span>
+                    <span class="campaign-pct-value" data-stat="pct">0</span><span class="campaign-pct-sign">%</span>
                     <span class="campaign-pct-label">completado</span>
                 </div>
             </header>
 
-            <div class="progress progress-lg" role="progressbar" aria-label="Progreso de la campaña"
-                aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="progress progress-lg" role="progressbar" aria-label="Progreso de la campaña" aria-valuemin="0"
+                aria-valuemax="100" aria-valuenow="0">
                 <span class="progress-bar progress-bar-passed" data-bar="passed" style="width: 0%"></span>
                 <span class="progress-bar progress-bar-failed" data-bar="failed" style="width: 0%"></span>
                 <span class="progress-bar progress-bar-rest" data-bar="rest" style="width: 100%"></span>
@@ -209,14 +192,14 @@
             <footer class="campaign-card-foot">
                 <div class="campaign-metrics">
                     <span class="metric"><strong data-stat="abiertos">0</strong> pixel abierto</span>
-                    <span class="metric"><strong data-stat="reportados">0</strong> reportados</span>
                     <span class="metric"><strong data-stat="clics">0</strong> clics</span>
                 </div>
-                <form method="post" action="">
-                    <input type="hidden" name="accion" value="activar">
-                    <input type="hidden" name="campana_id" value="{{ c.camid }}">
-                    <button type="submit" class="btn btn-primary btn-sm" disabled>Activar y enviar</button>
-                </form>
+                <div class="campaign-actions">
+                    <button type="button" class="btn btn-ghost-danger btn-sm" data-accion="eliminar-campana"
+                        data-campana-id="{{ c.camid }}" data-campana-nombre="{{ c.nombre }}">Eliminar</button>
+                    <button type="button" class="btn btn-primary btn-sm" data-accion="enviar"
+                        data-campana-id="{{ c.camid }}" disabled>Activar y enviar</button>
+                </div>
             </footer>
         </article>
         {% else %}
@@ -225,7 +208,6 @@
     </div>
 </div>
 
-<!-- ===================== Tabla de simulaciones ===================== -->
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Simulaciones</h2>
@@ -248,12 +230,10 @@
             <tbody>
                 {% for s in simulaciones %}
                 {% set completada = s.status == 'completed' or s.fecha_respuesta %}
-                {% set reportado = s.reportado if s.reportado is defined else s.aprobado %}
                 <tr class="sim-row" data-campana="{{ s.campana_id }}"
-                    data-campana-fecha="{{ fecha(s.campana_fecha, '%Y-%m-%d') }}"
-                    data-status="{{ s.status }}" data-completada="{{ 'true' if completada else 'false' }}"
-                    data-aprobado="{{ 'true' if s.aprobado else 'false' }}"
-                    data-reportado="{{ 'true' if reportado else 'false' }}">
+                    data-campana-fecha="{{ fecha(s.campana_fecha, '%Y-%m-%d') }}" data-status="{{ s.status }}"
+                    data-completada="{{ 'true' if completada else 'false' }}"
+                    data-aprobado="{{ 'true' if s.aprobado else 'false' }}">
                     <td>{{ s.empleado_nombre }}</td>
                     <td>{{ s.empleado_email }}</td>
                     <td>{{ s.campana_nombre }}</td>
@@ -272,6 +252,48 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<div class="modal" id="modalEliminarCampana" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="tituloEliminarCampana">
+        <div class="modal-header">
+            <h2 class="card-title" id="tituloEliminarCampana">Eliminar campaña</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+
+        <p class="text-secondary">
+            Vas a eliminar la campaña <strong id="eliminar-campana-nombre"></strong>.
+        </p>
+
+        <div class="warning-box">
+            <svg class="warning-box-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3.5 2.5 20h19L12 3.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+                </path>
+                <path d="M12 10v4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                <circle cx="12" cy="17.4" r="1" fill="currentColor"></circle>
+            </svg>
+            <div>
+                <span class="warning-box-title">Esta acción elimina datos de forma permanente</span>
+                <p>
+                    Se borrarán <strong id="eliminar-campana-total">0</strong> simulaciones junto con sus
+                    resultados: aperturas de pixel, clics, aprobaciones y fechas de respuesta.
+                    La información no se puede recuperar.
+                </p>
+            </div>
+        </div>
+
+        <p class="field-error" id="errorEliminarCampana" role="alert" hidden></p>
+
+        <form method="post" action="" id="formEliminarCampana">
+            <input type="hidden" name="accion" value="eliminar-campana">
+            <input type="hidden" name="campana_id" id="eliminar-campana-id">
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+                <button type="submit" class="btn btn-danger">Sí, eliminar campaña</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -293,8 +315,138 @@
 
         var ABIERTO = ["opened", "clicked", "completed"];
         var CLIC = ["clicked", "completed"];
+        var datePickers = [];
 
         function toArray(lista) { return Array.prototype.slice.call(lista || []); }
+
+        function isoDate(date) {
+            return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" +
+                String(date.getDate()).padStart(2, "0");
+        }
+
+        function parseISODate(value) {
+            if (!value) return null;
+            var parts = value.split("-").map(Number);
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        function initDatePickers() {
+            var monthFormat = new Intl.DateTimeFormat("es-CO", { month: "long", year: "numeric" });
+            var dateFormat = new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" });
+            var longDateFormat = new Intl.DateTimeFormat("es-CO", {
+                day: "numeric", month: "long", year: "numeric"
+            });
+
+            toArray(document.querySelectorAll("[data-date-picker]")).forEach(function (picker) {
+                var input = picker.querySelector('input[type="hidden"]');
+                var trigger = picker.querySelector(".date-picker-trigger");
+                var label = picker.querySelector("[data-date-label]");
+                var popover = picker.querySelector(".date-picker-popover");
+                var title = picker.querySelector("[data-calendar-title]");
+                var days = picker.querySelector("[data-calendar-days]");
+                var selection = picker.querySelector("[data-calendar-selection]");
+                var viewDate = parseISODate(input.value) || new Date();
+
+                function close(restoreFocus) {
+                    popover.hidden = true;
+                    trigger.setAttribute("aria-expanded", "false");
+                    if (restoreFocus) trigger.focus();
+                }
+
+                function render() {
+                    var year = viewDate.getFullYear();
+                    var month = viewDate.getMonth();
+                    var selected = input.value;
+                    var today = isoDate(new Date());
+                    var offset = (new Date(year, month, 1).getDay() + 6) % 7;
+                    var count = new Date(year, month + 1, 0).getDate();
+
+                    title.textContent = monthFormat.format(viewDate);
+                    selection.textContent = selected
+                        ? "Seleccionada: " + longDateFormat.format(parseISODate(selected))
+                        : "Sin fecha seleccionada";
+                    days.replaceChildren();
+
+                    for (var blank = 0; blank < offset; blank++) {
+                        var spacer = document.createElement("span");
+                        spacer.setAttribute("aria-hidden", "true");
+                        days.appendChild(spacer);
+                    }
+
+                    for (var day = 1; day <= count; day++) {
+                        var date = new Date(year, month, day);
+                        var value = isoDate(date);
+                        var button = document.createElement("button");
+                        button.type = "button";
+                        button.className = "date-picker-day";
+                        button.textContent = String(day);
+                        button.setAttribute("role", "gridcell");
+                        button.setAttribute("aria-label", longDateFormat.format(date));
+                        button.setAttribute("aria-pressed", value === selected ? "true" : "false");
+                        if (value === selected) button.classList.add("is-selected");
+                        if (value === today) button.classList.add("is-today");
+                        button.addEventListener("click", function (selectedDate, selectedValue) {
+                            return function () {
+                                input.value = selectedValue;
+                                label.textContent = dateFormat.format(selectedDate);
+                                input.dispatchEvent(new Event("change", { bubbles: true }));
+                                close(true);
+                            };
+                        }(date, value));
+                        days.appendChild(button);
+                    }
+                }
+
+                trigger.addEventListener("click", function () {
+                    datePickers.forEach(function (datePicker) { datePicker.close(false); });
+                    var selected = parseISODate(input.value);
+                    viewDate = selected || new Date();
+                    render();
+                    popover.hidden = false;
+                    trigger.setAttribute("aria-expanded", "true");
+                    var activeDay = days.querySelector(".is-selected") || days.querySelector("button");
+                    if (activeDay) activeDay.focus();
+                });
+
+                picker.querySelector("[data-calendar-prev]").addEventListener("click", function () {
+                    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+                    render();
+                });
+
+                picker.querySelector("[data-calendar-next]").addEventListener("click", function () {
+                    viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+                    render();
+                });
+
+                picker.querySelector("[data-calendar-clear]").addEventListener("click", function () {
+                    input.value = "";
+                    label.textContent = "Seleccionar fecha";
+                    input.dispatchEvent(new Event("change", { bubbles: true }));
+                    close(true);
+                });
+
+                if (input.value) label.textContent = dateFormat.format(parseISODate(input.value));
+                datePickers.push({ element: picker, close: close });
+            });
+
+            document.addEventListener("click", function (event) {
+                datePickers.forEach(function (datePicker) {
+                    if (!datePicker.element.contains(event.target)) datePicker.close(false);
+                });
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape") {
+                    datePickers.forEach(function (datePicker) {
+                        if (!datePicker.element.querySelector(".date-picker-popover").hidden) {
+                            datePicker.close(true);
+                        }
+                    });
+                }
+            });
+        }
+
+        initDatePickers();
 
         function leerFila(tr) {
             var status = tr.getAttribute("data-status") || "pending";
@@ -304,7 +456,6 @@
                 campanaFecha: tr.getAttribute("data-campana-fecha") || "",
                 completada: tr.getAttribute("data-completada") === "true",
                 aprobado: tr.getAttribute("data-aprobado") === "true",
-                reportado: tr.getAttribute("data-reportado") === "true",
                 pendiente: status === "pending",
                 abierto: ABIERTO.indexOf(status) !== -1,
                 clic: CLIC.indexOf(status) !== -1
@@ -314,8 +465,10 @@
         var filas = toArray(tabla.querySelectorAll("tbody tr.sim-row")).map(leerFila);
 
         function vacio() {
-            return { total: 0, pendientes: 0, completadas: 0, aprobadas: 0,
-                     fallidas: 0, reportados: 0, abiertos: 0, clics: 0 };
+            return {
+                total: 0, pendientes: 0, completadas: 0, aprobadas: 0,
+                fallidas: 0, abiertos: 0, clics: 0
+            };
         }
 
         function acumular(acc, fila) {
@@ -325,7 +478,6 @@
                 acc.completadas++;
                 if (fila.aprobado) acc.aprobadas++; else acc.fallidas++;
             }
-            if (fila.reportado) acc.reportados++;
             if (fila.abierto) acc.abiertos++;
             if (fila.clic) acc.clics++;
             return acc;
@@ -382,7 +534,7 @@
                     nodo.textContent = stats[nodo.getAttribute("data-stat")] || 0;
                 });
 
-                var boton = item.querySelector('button[type="submit"]');
+                var boton = item.querySelector('[data-accion="enviar"]');
                 if (boton) {
                     boton.disabled = stats.pendientes === 0;
                     boton.textContent = stats.pendientes
@@ -423,9 +575,121 @@
                 selCampana.value = "";
                 inDesde.value = "";
                 inHasta.value = "";
+                toArray(document.querySelectorAll("[data-date-picker] [data-date-label]")).forEach(
+                    function (label) { label.textContent = "Seleccionar fecha"; }
+                );
                 aplicarFiltros();
             });
         }
+
+        listaCampanas.addEventListener("click", function (event) {
+            var boton = event.target.closest('[data-accion="eliminar-campana"]');
+            if (!boton) return;
+
+            var tarjeta = boton.closest(".campaign-card");
+            var total = tarjeta ? tarjeta.querySelector('[data-stat="total"]') : null;
+
+            var errorEliminar = document.getElementById("errorEliminarCampana");
+            errorEliminar.textContent = "";
+            errorEliminar.hidden = true;
+
+            document.getElementById("eliminar-campana-id").value =
+                boton.getAttribute("data-campana-id");
+            document.getElementById("eliminar-campana-nombre").textContent =
+                boton.getAttribute("data-campana-nombre");
+            document.getElementById("eliminar-campana-total").textContent =
+                total ? total.textContent : "0";
+
+            if (typeof showModal === "function") showModal("modalEliminarCampana");
+        });
+
+        /* ------------------------------------------------ activar y enviar */
+        var feedbackCampanas = document.createElement("p");
+        feedbackCampanas.className = "campaign-feedback";
+        feedbackCampanas.hidden = true;
+        if (listaCampanas.parentNode) {
+            listaCampanas.parentNode.insertBefore(feedbackCampanas, listaCampanas);
+        }
+
+        function mostrarFeedback(mensaje, tipo) {
+            feedbackCampanas.textContent = mensaje || "";
+            feedbackCampanas.classList.toggle("is-error", tipo === "error");
+            feedbackCampanas.classList.toggle("is-ok", tipo === "ok");
+            feedbackCampanas.hidden = !mensaje;
+        }
+
+        listaCampanas.addEventListener("click", async function (event) {
+            var boton = event.target.closest('[data-accion="enviar"]');
+            if (!boton || boton.disabled) return;
+
+            var camid = boton.getAttribute("data-campana-id");
+            if (!camid) return;
+
+            var textoOriginal = boton.textContent;
+            boton.disabled = true;
+            boton.textContent = "Enviando…";
+            mostrarFeedback("");
+
+            try {
+                var response = await fetch(
+                    "/api/campañas/" + encodeURIComponent(camid) + "/enviar",
+                    { method: "POST", headers: { "Accept": "application/json" } }
+                );
+
+                if (!response.ok) {
+                    var error = await response.json().catch(function () { return {}; });
+                    mostrarFeedback(getErrorMessage(error), "error");
+                    boton.disabled = false;
+                    boton.textContent = textoOriginal;
+                    return;
+                }
+
+                mostrarFeedback("Envío encolado. Recargando…", "ok");
+                window.location.reload();
+            } catch (error) {
+                mostrarFeedback(getErrorMessage({ detail: error.message }), "error");
+                boton.disabled = false;
+                boton.textContent = textoOriginal;
+            }
+        });
+
+        var formEliminarCampana = document.getElementById("formEliminarCampana");
+        formEliminarCampana.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            var campaignId = document.getElementById("eliminar-campana-id").value;
+            var button = formEliminarCampana.querySelector('button[type="submit"]');
+            var errorMessage = document.getElementById("errorEliminarCampana");
+            if (!campaignId) return;
+
+            errorMessage.textContent = "";
+            errorMessage.hidden = true;
+            button.disabled = true;
+            button.textContent = "Eliminando…";
+
+            try {
+                var response = await fetch("/api/campañas/" + encodeURIComponent(campaignId), {
+                    method: "DELETE",
+                    headers: { "Accept": "application/json" }
+                });
+
+                if (!response.ok) {
+                    var error = await response.json().catch(function () { return {}; });
+                    errorMessage.textContent = getErrorMessage(error);
+                    errorMessage.hidden = false;
+                    return;
+                }
+
+                hideModal("modalEliminarCampana");
+                window.location.reload();
+            } catch (error) {
+                errorMessage.textContent = getErrorMessage({ detail: error.message });
+                errorMessage.hidden = false;
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sí, eliminar campaña";
+            }
+        });
 
         aplicarFiltros();
     })();

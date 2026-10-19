@@ -15,13 +15,6 @@
 {% endif %}
 {%- endmacro %}
 
-{# Rutas que debe exponer el backend:
-POST /empleado-nuevo name="empleado_manual" (ya existe)
-POST /empleado-importar name="empleado_importar" (ya existe)
-POST /empleado-actualizar/{eeid} name="empleado_actualizar"
-POST /empleado-eliminar/{eeid} name="empleado_eliminar"
-Todas responden con redirect 303 a /empleados. #}
-
 {% block content %}
 <div class="flex-between mb-3">
     <div>
@@ -91,8 +84,12 @@ Todas responden con redirect 303 a /empleados. #}
                             <button type="button" class="btn btn-secondary btn-sm" data-action="editar"
                                 data-ee-id="{{ employee.eeid }}" data-ee-nombre="{{ employee.nombre }}"
                                 data-ee-email="{{ employee.email }}" data-ee-empresa="{{ employee.empresa }}"
-                                data-ee-cargo="{{ employee.cargo or '' }}" data-ee-riesgo="{{ employee.riesgo }}"
+                                data-ee-cargo="{{ employee.cargo or '' }}"
                                 data-ee-estado="{{ 'true' if employee.estado else 'false' }}">Editar</button>
+                            <button type="button" class="btn btn-outline btn-sm" data-action="estado"
+                                data-ee-id="{{ employee.eeid }}" data-ee-nombre="{{ employee.nombre }}"
+                                data-ee-estado="{{ 'true' if employee.estado else 'false' }}">{{ 'Desactivar' if
+                                employee.estado else 'Activar' }}</button>
                             <button type="button" class="btn btn-ghost-danger btn-sm" data-action="eliminar"
                                 data-ee-id="{{ employee.eeid }}"
                                 data-ee-nombre="{{ employee.nombre }}">Eliminar</button>
@@ -130,24 +127,23 @@ Todas responden con redirect 303 a /empleados. #}
 
             <div data-tab-panel="manual">
                 {# Campos: nombre, email, empresa, cargo #}
-                <form method="post" id="formAgregar" action="">
+                <form id="formAgregarEmpleado">
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="nuevo-nombre">Nombre completo</label>
-                            <input type="text" id="nuevo-nombre" name="nombre" placeholder="Ej. Ana Pérez" required>
+                            <input type="text" id="nuevo-nombre" name="nombre" placeholder="Jose Franco" required>
                         </div>
                         <div class="form-group">
                             <label for="nuevo-email">Email</label>
-                            <input type="email" id="nuevo-email" name="email" placeholder="ana@empresa.com" required>
+                            <input type="email" id="nuevo-email" name="email" placeholder="jose@empresa.com" required>
                         </div>
                         <div class="form-group">
                             <label for="nuevo-empresa">Empresa</label>
-                            <input type="text" id="nuevo-empresa" name="empresa" placeholder="Ej. Mi PYME S.A.S."
-                                required>
+                            <input type="text" id="nuevo-empresa" name="empresa" placeholder="Mi PYME S.A.S." required>
                         </div>
                         <div class="form-group">
                             <label for="nuevo-cargo">Cargo <span class="text-muted">(opcional)</span></label>
-                            <input type="text" id="nuevo-cargo" name="cargo" placeholder="Ej. Contadora">
+                            <input type="text" id="nuevo-cargo" name="cargo" placeholder="Contadora Senior">
                         </div>
                     </div>
                     <div class="modal-actions">
@@ -159,7 +155,7 @@ Todas responden con redirect 303 a /empleados. #}
 
             <div data-tab-panel="csv" hidden>
                 {# POST multipart; campo del archivo: 'archivo' #}
-                <form method="post" id="formImportar" action="" enctype="multipart/form-data">
+                <form id="formImportarEmpleado" enctype="multipart/form-data">
                     <div class="form-group mb-2">
                         <label for="nuevo-csv">Archivo CSV</label>
                         <input type="file" id="nuevo-csv" name="archivo" accept=".csv,text/csv" required>
@@ -190,7 +186,7 @@ Todas responden con redirect 303 a /empleados. #}
             <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
         </div>
 
-        <form method="post" id="formEditar" action="">
+        <form id="formEditarEmpleado">
             <input type="hidden" name="eeid" id="editar-eeid">
             <div class="form-grid">
                 <div class="form-group">
@@ -231,13 +227,47 @@ Todas responden con redirect 303 a /empleados. #}
             ¿Eliminar a <strong id="eliminar-nombre"></strong>? Esta acción no se puede deshacer.
         </p>
 
-        <form method="post" id="formEliminar" action="">
+        <form id="formEliminarEmpleado">
             <input type="hidden" name="eeid" id="eliminar-eeid">
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
                 <button type="submit" class="btn btn-danger">Eliminar</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal: operación exitosa -->
+<div class="modal" id="successModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="successModalLabel">
+        <div class="modal-header">
+            <h2 class="card-title text-success" id="successModalLabel">Operación exitosa</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-success" role="status">
+            <p id="successMessage" class="alert-text"></p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-primary" data-modal-close>Continuar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: error -->
+<div class="modal" id="errorModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="errorModalLabel">
+        <div class="modal-header">
+            <h2 class="card-title text-danger" id="errorModalLabel">No se pudo completar la operación</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-danger" role="alert">
+            <p id="errorMessage" class="alert-text"></p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-modal-close>Cerrar</button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -247,11 +277,6 @@ Todas responden con redirect 303 a /empleados. #}
     (function () {
         "use strict";
 
-        var URL_ACTUALIZAR = "/empleado-actualizar/";
-        var URL_ELIMINAR = "/empleado-eliminar/";
-
-        var formEditar = document.getElementById("formEditar");
-        var formEliminar = document.getElementById("formEliminar");
         var tabla = document.getElementById("tablaEmpleados");
 
         function setValue(id, value) {
@@ -269,7 +294,6 @@ Todas responden con redirect 303 a /empleados. #}
             setValue("editar-estado", data.eeEstado);
 
             document.getElementById("editar-subtitulo").textContent = data.eeEmail || "";
-            formEditar.action = URL_ACTUALIZAR + data.eeId;
 
             showModal("modalEmpleadoEditar");
         }
@@ -277,7 +301,6 @@ Todas responden con redirect 303 a /empleados. #}
         function abrirEliminacion(data) {
             setValue("eliminar-eeid", data.eeId);
             document.getElementById("eliminar-nombre").textContent = data.eeNombre || "este empleado";
-            formEliminar.action = URL_ELIMINAR + data.eeId;
 
             showModal("modalEmpleadoEliminar");
         }
@@ -299,6 +322,162 @@ Todas responden con redirect 303 a /empleados. #}
 
         if (window.location.hash === "#nuevo") {
             showModal("modalEmpleadoNuevo");
+        }
+    })();
+</script>
+
+<script>
+    (function () {
+        "use strict";
+
+        var apiEmpleados = "/api/empleados";
+        var agregarForm = document.getElementById("formAgregarEmpleado");
+        var editarForm = document.getElementById("formEditarEmpleado");
+        var eliminarForm = document.getElementById("formEliminarEmpleado");
+
+        function mostrarError(error, modalId) {
+            document.getElementById("errorMessage").textContent = getErrorMessage(error);
+            hideModal(modalId);
+            showModal("errorModal");
+        }
+
+        function mostrarExito(message, modalId) {
+            document.getElementById("successMessage").textContent = message;
+            hideModal(modalId);
+            document.getElementById("successModal").addEventListener(
+                "modal:close",
+                function () { window.location.reload(); },
+                { once: true }
+            );
+            showModal("successModal");
+        }
+
+        async function obtenerError(response) {
+            return response.json().catch(function () {
+                return {};
+            });
+        }
+
+        if (agregarForm) {
+            agregarForm.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                var empleadoData = Object.fromEntries(new FormData(agregarForm).entries());
+
+                try {
+                    var response = await fetch(apiEmpleados, {
+                        method: "POST",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(empleadoData)
+                    });
+
+                    if (!response.ok) {
+                        mostrarError(await obtenerError(response), "modalEmpleadoNuevo");
+                        return;
+                    }
+
+                    agregarForm.reset();
+                    mostrarExito("El empleado se creó correctamente.", "modalEmpleadoNuevo");
+                } catch (error) {
+                    mostrarError({ detail: error.message }, "modalEmpleadoNuevo");
+                }
+            });
+        }
+
+        if (editarForm) {
+            editarForm.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                var empleadoData = Object.fromEntries(new FormData(editarForm).entries());
+                var eeid = empleadoData.eeid;
+                delete empleadoData.eeid;
+
+                try {
+                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                        method: "PATCH",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(empleadoData)
+                    });
+
+                    if (!response.ok) {
+                        mostrarError(await obtenerError(response), "modalEmpleadoEditar");
+                        return;
+                    }
+
+                    mostrarExito("El empleado se actualizó correctamente.", "modalEmpleadoEditar");
+                } catch (error) {
+                    mostrarError({ detail: error.message }, "modalEmpleadoEditar");
+                }
+            });
+        }
+
+        if (eliminarForm) {
+            eliminarForm.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                var eeid = new FormData(eliminarForm).get("eeid");
+
+                try {
+                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                        method: "DELETE",
+                        headers: { "Accept": "application/json" }
+                    });
+
+                    if (!response.ok) {
+                        mostrarError(await obtenerError(response), "modalEmpleadoEliminar");
+                        return;
+                    }
+
+                    mostrarExito("El empleado se eliminó correctamente.", "modalEmpleadoEliminar");
+                } catch (error) {
+                    mostrarError({ detail: error.message }, "modalEmpleadoEliminar");
+                }
+            });
+        }
+
+        /* ------------------------------------------- activar / desactivar */
+        var tablaEmpleados = document.getElementById("tablaEmpleados");
+
+        if (tablaEmpleados) {
+            tablaEmpleados.addEventListener("click", async function (event) {
+                var boton = event.target.closest('[data-action="estado"]');
+                if (!boton) return;
+
+                var eeid = boton.getAttribute("data-ee-id");
+                var nuevoEstado = boton.getAttribute("data-ee-estado") !== "true";
+
+                boton.disabled = true;
+
+                try {
+                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                        method: "PATCH",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ estado: nuevoEstado })
+                    });
+
+                    if (!response.ok) {
+                        boton.disabled = false;
+                        mostrarError(await obtenerError(response), null);
+                        return;
+                    }
+
+                    mostrarExito(
+                        nuevoEstado
+                            ? "El empleado se activó correctamente."
+                            : "El empleado se desactivó correctamente.",
+                        null
+                    );
+                } catch (error) {
+                    boton.disabled = false;
+                    mostrarError({ detail: error.message }, null);
+                }
+            });
         }
     })();
 </script>
