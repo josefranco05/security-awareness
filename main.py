@@ -20,6 +20,7 @@ from pydantic import ValidationError
 
 from fastapi import FastAPI, Form, Request, HTTPException, File, UploadFile, status, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
@@ -29,10 +30,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sqlalchemy import select, func, ScalarResult
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+import logging
 
 import models
-from database import Base, engine, get_db
-from routers import empleados, simulaciones
+from database.async_database import Base, engine, get_db
+from routers import campañas as campañas_router, empleados, simulaciones, webhooks, usuarios
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,6 +47,16 @@ load_dotenv(dotenv_path=env_path)
 SECRET_KEY = os.getenv("SECRET_KEY")
 if SECRET_KEY is None:
     raise ValueError("SECRET_KEY is not setup. Please set environment variable.")
+
+# Muestra también los logger.info de la app (p. ej. el resumen de envío de
+# worker/tasks.py en modo eager). Por defecto Python solo muestra WARNING+.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -68,6 +82,9 @@ templates = Jinja2Templates(directory="templates")
 
 app.include_router(simulaciones.router, prefix="/api/simulaciones", tags=["simulaciones"])
 app.include_router(empleados.router, prefix="/api/empleados", tags=["empleados"])
+app.include_router(campañas_router.router, prefix="/api/campañas", tags=["campañas"])
+app.include_router(usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 
 # Flash messages, exponen get_flashed_messages() dentro de los templates
@@ -145,11 +162,45 @@ async def ver_empleados(
         "activos": activos,
         "inactivos": inactivos
     }
-    return templates.TemplateResponse(request, "empleados.html", {"employees": all_ees, "stats": stats, "record_count": total_ees})
+    return templates.TemplateResponse(
+        request, 
+        "empleados.html", 
+        {"employees": all_ees, "stats": stats, "record_count": total_ees}
+    )
 
 @app.get("/campañas", name="campañas", include_in_schema=False)
-async def campañas(request: Request):
-    return templates.TemplateResponse(request, "campañas.html", {})
+async def campañas(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
+    result = await db.scalars(
+        select(models.Campaña)
+        .options(
+            selectinload(models.Campaña.simulaciones)
+            .selectinload(models.Simulaciones.empleados)
+        )
+        .order_by(models.Campaña.fecha.desc())
+    )
+    campanas = result.all()
+    simulaciones = [
+        {
+            "id": simulacion.id,
+            "campana_id": campana.camid,
+            "campana_nombre": campana.nombre,
+            "campana_fecha": campana.fecha,
+            "empleado_nombre": simulacion.empleados.nombre,
+            "empleado_email": simulacion.empleados.email,
+            "fecha_envio": simulacion.fecha_envio,
+            "fecha_respuesta": simulacion.fecha_respuesta,
+            "status": simulacion.status,
+            "aprobado": simulacion.aprobado,
+        }
+        for campana in campanas
+        for simulacion in campana.simulaciones
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "campañas.html",
+        {"campanas": campanas, "simulaciones": simulaciones},
+    )
 
 @app.get("/deteccion", name="deteccion", include_in_schema=False)
 async def deteccion(request: Request):
@@ -166,7 +217,7 @@ async def simulacion(request: Request, db: Annotated[AsyncSession, Depends(get_d
         select(models.Empleados).where(models.Empleados.estado == True)
     )
     empleados = results.all()
-    return templates.TemplateResponse(request, "simulaciones.html", {"employees": empleados})
+    return templates.TemplateResponse(request, "simulacion.html", {"employees": empleados})
 
 
 @app.get("/recuperar-contrasena", name="forgot_password", include_in_schema=False)
@@ -181,17 +232,19 @@ async def login_form(request: Request):
 
 
 @app.exception_handler(StarletteHTTPException)
-async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
-    error_message = (
-        exception.detail if exception.detail else "Ha ocurrido un error. Por favor verifica tu solicitud e intenta nuevamente."
-    )
-
+async def general_http_exception_handler(
+    request: Request, 
+    exception: StarletteHTTPException
+):
     if request.url.path.startswith("/api"):
-        return JSONResponse(
-            status_code=exception.status_code,
-            content={"detail": error_message}
+        return await http_exception_handler(request, exception)
+    
+    error_message = (
+            exception.detail 
+            if exception.detail 
+            else "Ha ocurrido un error. Por favor verifica tu solicitud e intenta nuevamente."
         )
-
+    
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -205,10 +258,7 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 @app.exception_handler(RequestValidationError)
 async def general_validation_error(request: Request, exception: RequestValidationError): 
     if request.url.path.startswith("/api"):
-        return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={"detail": exception.errors()}   
-        )
+        return await request_validation_exception_handler(request, exception)
     
     return templates.TemplateResponse(
         request,

@@ -2,29 +2,53 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, status, HTTPException
-from fastapi import Request, Depends
-from sqlalchemy import select, func
+from fastapi import APIRouter, status, HTTPException, Depends
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from database import get_db
+from database.async_database import get_db
 from schemas.empleados import EmpleadoResponse, EmpleadoCreate, EmpleadoUpdate
-from utils.validaciones_empleados import validar_email, validar_empleado_por_id
+from utils.validaciones import validar_email_empleado, validar_empleado_por_id
 
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[EmpleadoResponse])
+@router.get(
+        "", 
+        response_model=list[EmpleadoResponse]
+)
 async def get_empleados(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    result = await db.scalars(select(models.Empleados))
+    result = await db.scalars(
+        select(models.Empleados)
+        .options(selectinload(models.Empleados.simulaciones))
+        .order_by(models.Empleados.riesgo.desc())
+    )
     empleados = result.all()
     return empleados
+
+
+@router.get(
+        "/{eeid}", 
+        response_model=EmpleadoResponse
+)
+async def get_empleado(
+    eeid: int,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    result = await db.scalars(
+        select(models.Empleados)
+        .options(selectinload(models.Empleados.simulaciones))
+        .where(models.Empleados.eeid == eeid)
+        .order_by(models.Empleados.riesgo.desc())
+    )
+    empleado = result.first()
+    return empleado
 
 
 @router.post(
@@ -32,11 +56,11 @@ async def get_empleados(
         response_model=EmpleadoResponse, 
         status_code=status.HTTP_201_CREATED
     )
-async def post_empleado(
+async def agregar_empleado(
     empleado: EmpleadoCreate,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    await validar_email(empleado.email, db)
+    await validar_email_empleado(empleado.email, db)
 
     nuevo_empleado = models.Empleados(
         nombre=empleado.nombre,
@@ -54,11 +78,37 @@ async def post_empleado(
     return nuevo_empleado
 
 
+@router.put(
+    "/{eeid}",
+    response_model=EmpleadoResponse,
+)
+async def remplazar_empleado(
+    eeid: int,
+    empleado: EmpleadoCreate,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    empleado_a_cambiar = await validar_empleado_por_id(eeid, db)
+
+    await validar_email_empleado(empleado.email, db, eeid)
+
+    empleado_a_cambiar.nombre = empleado.nombre
+    empleado_a_cambiar.email = empleado.email
+    empleado_a_cambiar.empresa = empleado.empresa
+    empleado_a_cambiar.cargo = str(empleado.cargo)
+    empleado_a_cambiar.riesgo = empleado.riesgo
+    empleado_a_cambiar.estado = empleado.estado
+
+    await db.commit()
+    await db.refresh(empleado_a_cambiar, attribute_names=["simulaciones"])
+
+    return empleado_a_cambiar    
+
+
 @router.patch(
     "/{eeid}",
     response_model=EmpleadoResponse,
 )
-async def update_empleado_parcial(
+async def editar_empleado(
     eeid: int,
     empleado: EmpleadoUpdate,
     db: Annotated[AsyncSession, Depends(get_db)]
@@ -73,7 +123,7 @@ async def update_empleado_parcial(
         )    
     
     if cambios.get("email") is not None:
-        await validar_email(cambios["email"], db, id_excluir=eeid)
+        await validar_email_empleado(cambios["email"], db, eeid)
 
     for campo, valor in cambios.items():
         setattr(empleado_a_cambiar, campo, valor)
@@ -87,7 +137,7 @@ async def update_empleado_parcial(
     "/{eeid}",
     status_code=status.HTTP_204_NO_CONTENT
 )
-async def delete_empleado(
+async def eliminar_empleado(
     eeid: int,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):

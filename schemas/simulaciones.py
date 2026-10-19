@@ -1,16 +1,30 @@
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime
 from typing import Literal
-from datetime import UTC, datetime
-from functools import partial
+
+from pydantic import BaseModel, ConfigDict
+
+
+SimulacionStatus = Literal[
+    "pending",
+    "sent",
+    "sending",
+    "failed",
+    "opened",
+    "clicked",
+    "completed",
+]
 
 
 class SimulacionBase(BaseModel):
     campana_id: int
-    status: Literal["pending", "sent", "opened", "clicked", "completed"]
-    fecha_envio: datetime = Field(default_factory=partial(datetime.now, UTC))
+    status: SimulacionStatus
+    # Nullable: solo se llena cuando el correo se envía de verdad.
+    fecha_envio: datetime | None = None
+
 
 class SimulacionCreate(SimulacionBase):
     ee_id: int
+
 
 class SimulacionResponse(SimulacionBase):
     model_config = ConfigDict(from_attributes=True)
@@ -19,3 +33,5 @@ class SimulacionResponse(SimulacionBase):
     ee_id: int
     fecha_respuesta: datetime | None
     aprobado: bool
+    intentos: int = 0
+    error: str | None = None

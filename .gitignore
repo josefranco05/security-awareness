@@ -1,0 +1,74 @@
+# ============================================================================
+# Sentinel Fish — archivos que NO deben versionarse
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+.venv/
+venv/
+antenv/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Secretos y configuración local
+# ---------------------------------------------------------------------------
+# OJO: .env YA está rastreado en este repositorio (contiene SECRET_KEY).
+# Añadirlo aquí no lo destrackea por sí solo. Para dejar de versionarlo:
+#     git rm --cached .env
+#     git commit -m "Dejar de versionar .env"
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# SQLite
+# ---------------------------------------------------------------------------
+# database.db se mantiene rastreado a propósito: son los datos de demostración
+# que necesita el despliegue. Solo se ignoran los archivos auxiliares del
+# modo WAL, que cambian en cada ejecución.
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Copias de seguridad locales
+backups/
+*.bak
+
+# ---------------------------------------------------------------------------
+# Celery
+# ---------------------------------------------------------------------------
+celerybeat-schedule*
+*.pid
+
+# ---------------------------------------------------------------------------
+# Pruebas y cachés de herramientas
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+pip_tmp/
+pip_cache/
+
+# ---------------------------------------------------------------------------
+# Editores y sistema operativo
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
+*.log

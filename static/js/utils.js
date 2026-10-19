@@ -19,6 +19,15 @@
     var openStack = [];
     var lastFocused = null;
 
+    function getErrorMessage(error) {
+        if (typeof error.detail === "string") {
+            return error.detail;
+        } else if (Array.isArray(error.detail)) {
+            return error.detail.map((err) => err.msg).join(". ");
+        }
+        return "An error occurred. Please try again.";
+    }
+
     function toArray(list) { return Array.prototype.slice.call(list || []); }
 
     function getModal(id) {
@@ -158,6 +167,7 @@
     global.hideModal = hideModal;
     global.initTabs = initTabs;
     global.setVisible = global.setVisible || setVisible;
+    global.getErrorMessage = getErrorMessage;
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () { initTabs(document); });
