@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
@@ -45,7 +45,7 @@ async def validar_email_empleado(
         db: AsyncSession,
         id_excluir: int | None = None
     ):
-    query = select(models.Empleados).where(models.Empleados.email == email)
+    query = select(models.Empleados).where(func.lower(models.Empleados.email) == email.lower())
     
     if id_excluir is not None:
         query = query.where(models.Empleados.eeid != id_excluir)
@@ -63,7 +63,7 @@ async def validar_email_usuario(
         db: AsyncSession,
         uid_excluir: int | None = None
     ):
-    query = select(models.User).where(models.User.email == email)
+    query = select(models.User).where(func.lower(models.User.email) == email.lower())
     
     if uid_excluir is not None:
         query = query.where(models.User.uid != uid_excluir)
@@ -73,6 +73,7 @@ async def validar_email_usuario(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ya existe un usuario con email {email}"
         )
+    return None
 
 
 async def validar_usuario(
@@ -80,7 +81,7 @@ async def validar_usuario(
         db: AsyncSession
 ):
     result = await db.scalars(
-        select(models.User).where(models.User.username == username)
+        select(models.User).where(func.lower(models.User.username) == username.lower())
     )
     existing_user = result.first()
     if existing_user:

@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 from typing import Annotated
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 import models
+from core.config import settings
 from schemas.usuarios import Token, UserCreate, UserPublic, UserPrivate, UserUpdate
 from database.async_database import get_db
-from core.auth import CurrentUser, authenticate_user, create_access_token, hash_password
+from core.auth import (
+    autenticar_usuario,
+    CurrentUser,
+    create_access_token, 
+    hash_password,
+    _credentials_exception)
 from utils.validaciones import validar_usuario, validar_email_usuario
 
 
@@ -19,6 +26,14 @@ router = APIRouter()
 
 
 # AUTENTICACIÓN
+@router.get(
+        "/me",
+        response_model=UserPrivate
+)
+async def get_usuario_actual(current_user: CurrentUser):
+    return current_user
+
+
 @router.post(
         "/token",
         response_model=Token
@@ -27,23 +42,10 @@ async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    usuario = await authenticate_user(db, form_data.username, form_data.password)
+    usuario = await autenticar_usuario(db, form_data.username, form_data.password)
     if usuario is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return create_access_token(usuario.uid)
-
-
-# Debe ir antes de "/{uid}", si no "me" se interpreta como un uid.
-@router.get(
-        "/me",
-        response_model=UserPrivate
-)
-async def get_usuario_actual(current_user: CurrentUser):
-    return current_user
+        raise _credentials_exception
+    return create_access_token(subject=usuario.uid)
 
 
 # CRUD
@@ -97,7 +99,7 @@ async def crear_usuario(
         username=user.username,
         nombre=user.nombre,
         apellidos=user.apellidos,
-        email=user.email,
+        email=user.email.lower(),
         password_hash=hash_password(user.password)
     )
 
@@ -106,14 +108,6 @@ async def crear_usuario(
     await db.refresh(nuevo_usuario)
 
     return nuevo_usuario
-
-
-def _verificar_propietario(uid: int, current_user: models.User) -> None:
-    if current_user.uid != uid:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para modificar este usuario."
-        )
 
 
 @router.patch(
@@ -159,3 +153,11 @@ async def eliminar_usuario(
 
     await db.delete(current_user)
     await db.commit()
+
+# HELPER PARA PERMISOS DE MODIFICAR USUARIOS
+def _verificar_propietario(uid: int, current_user: models.User) -> None:
+    if current_user.uid != uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para modificar este usuario."
+        )

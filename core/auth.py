@@ -20,7 +20,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
@@ -28,36 +28,31 @@ from core.config import settings
 from database.async_database import get_db
 from schemas.usuarios import Token
 
-TOKEN_URL = "/api/usuarios/token"
+password_hash = PasswordHash.recommended()
 
+TOKEN_URL = "/api/usuarios/token"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=TOKEN_URL)
 
-password_hash = PasswordHash((Argon2Hasher(),))
-
-
-_DUMMY_HASH = password_hash.hash("password")
+_DUMMY_HASH = password_hash.hash("password-default")
 
 
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
-def verify_password(password: str, hashed: str) -> bool:
-    return password_hash.verify(password, hashed)
+def verificar_password(crudo: str, hashed: str) -> bool:
+    return password_hash.verify(crudo, hashed)
 
 
-async def authenticate_user(
+async def autenticar_usuario(
     db: AsyncSession, username: str, password: str
 ) -> models.User | None:
     """Devuelve el usuario si las credenciales son correctas, si no None."""
     user = await db.scalar(
-        select(models.User).where(models.User.username == username)
-    )
-    if user is None:
-        verify_password(password, _DUMMY_HASH)
-        return None
-    if not verify_password(password, user.password_hash):
-        return None 
+        select(models.User).where(func.lower(models.User.username) == username.lower())
+     )
+    if not user or not verificar_password(password, user.password_hash):
+        raise _credentials_exception
     return user
 
 
@@ -70,7 +65,7 @@ def create_access_token(
 
     now = datetime.now(UTC)
     payload = {
-        "sub": str(subject),  # PyJWT exige que `sub` sea str
+        "sub": str(subject),
         "iat": now,
         "exp": now + expires_delta,
     }
@@ -82,25 +77,22 @@ def create_access_token(
     return Token(access_token=encoded, token_type="bearer")
 
 
-def decode_access_token(token: str) -> str:
+def verify_access_token(token: str) -> str:
     """Valida firma y expiración; devuelve el `sub`.
 
     Lanza jwt.InvalidTokenError (o una subclase) si el token no es válido.
     """
-    payload = jwt.decode(
-        token,
-        settings.SECRET_KEY_AUTH.get_secret_value(),
-        algorithms=[settings.ALGORITHM],  # lista fija: evita el ataque "alg: none"
-        options={"require": ["sub", "exp"]},
-    )
-    return payload["sub"]
-
-
-_credentials_exception = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="No se pudieron validar las credenciales.",
-    headers={"WWW-Authenticate": "Bearer"},
-)
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY_AUTH.get_secret_value(),
+            algorithms=[settings.ALGORITHM],  # lista fija: evita el ataque "alg: none"
+            options={"require": ["sub", "exp"]},
+        )
+    except (jwt.InvalidTokenError, ValueError):
+        return ""
+    else:
+        return payload["sub"]
 
 
 async def get_current_user(
@@ -108,9 +100,9 @@ async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> models.User:
     try:
-        uid = int(decode_access_token(token))
-    except (jwt.InvalidTokenError, ValueError):
-        raise _credentials_exception
+        uid = int(verify_access_token(token))
+    except (jwt.InvalidTokenError, ValueError, TypeError):
+        raise _token_expired
 
     user = await db.get(models.User, uid)
     if user is None:
@@ -119,3 +111,16 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
+
+
+_credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="No se pudieron validar las credenciales.",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+_token_expired = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Token invalido o expirado.",
+    headers={"WWW-Authenticate": "Bearer"},
+)
