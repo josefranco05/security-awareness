@@ -133,6 +133,9 @@ async def actualizar_usuario(
         await validar_email_usuario(cambios["email"], db, uid)
 
     for campo, valor in cambios.items():
+        if campo == "email":
+            setattr(current_user, campo, valor.lower())
+        else:
             setattr(current_user, campo, valor)
 
     await db.commit()

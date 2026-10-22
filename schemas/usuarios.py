@@ -25,10 +25,10 @@ class UserPrivate(UserPublic):
 
 
 class UserUpdate(BaseModel):
-    username: str | None = Field(min_length=1, max_length=50)
-    email: EmailStr | None
-    nombre: str | None = Field(min_length=1)
-    apellidos: str | None = Field(min_length=1)
+    username: str | None = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr | None = None
+    nombre: str | None = Field(default=None, min_length=1)
+    apellidos: str | None = Field(default=None, min_length=1)
 
 
 class Token(BaseModel):

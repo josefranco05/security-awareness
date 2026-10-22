@@ -28,12 +28,11 @@ from core.config import settings
 from database.async_database import get_db
 from schemas.usuarios import Token
 
+
 password_hash = PasswordHash.recommended()
 
 TOKEN_URL = "/api/usuarios/token"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=TOKEN_URL)
-
-_DUMMY_HASH = password_hash.hash("password-default")
 
 
 def hash_password(password: str) -> str:
@@ -106,7 +105,11 @@ async def get_current_user(
 
     user = await db.get(models.User, uid)
     if user is None:
-        raise _credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El usuario ingresado no existe.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
