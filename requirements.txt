@@ -10,3 +10,6 @@ aiosqlite
 celery[redis]>=5.6,<6
 redis>=5,<7
 azure-communication-email>=1.0,<2
+pwdlib[argon2]
+pyjwt
+

@@ -80,8 +80,7 @@ async def acs_eventos(
         )
 
         logger.info(
-            "webhook ACS: proveedor_id=%s -> %s (deliveryStatus=%s)",
-            proveedor_id, nuevo_estado, entrega,
+            f"webhook ACS: proveedor_id={proveedor_id} -> {nuevo_estado} (deliveryStatus={entrega})",
         )
 
     await db.commit()

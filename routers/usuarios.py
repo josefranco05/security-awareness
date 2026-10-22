@@ -3,22 +3,53 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 import models
-from schemas.usuarios import UserCreate, UserResponse, UserUpdate
+from schemas.usuarios import Token, UserCreate, UserPublic, UserPrivate, UserUpdate
 from database.async_database import get_db
-from utils.validaciones import validar_usuario, validar_email_usuario, validar_usuario_por_id
+from core.auth import CurrentUser, authenticate_user, create_access_token, hash_password
+from utils.validaciones import validar_usuario, validar_email_usuario
 
 
 router = APIRouter()
 
 
+# AUTENTICACIÓN
+@router.post(
+        "/token",
+        response_model=Token
+)
+async def login(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    usuario = await authenticate_user(db, form_data.username, form_data.password)
+    if usuario is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario o contraseña incorrectos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return create_access_token(usuario.uid)
+
+
+# Debe ir antes de "/{uid}", si no "me" se interpreta como un uid.
+@router.get(
+        "/me",
+        response_model=UserPrivate
+)
+async def get_usuario_actual(current_user: CurrentUser):
+    return current_user
+
+
+# CRUD
 @router.get(
         "",
-        response_model=UserResponse
+        response_model=list[UserPublic]
 )
 async def get_usuarios(
     db: Annotated[AsyncSession, Depends(get_db)]
@@ -26,28 +57,33 @@ async def get_usuarios(
     result = await db.scalars(
         select(models.User)
     )
-    empleados = result.all()
-    return empleados
+    usuarios = result.all()
+    return usuarios
 
 
 @router.get(
         "/{uid}",
-        response_model=UserResponse
+        response_model=UserPublic
 )
 async def get_usuario(
     uid: int,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    empleado = await db.scalar(
+    usuario = await db.scalar(
         select(models.User)
         .where(models.User.uid == uid)
     )
-    return empleado
+    if usuario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró un usuario con id {uid}"
+        )
+    return usuario
 
 
 @router.post(
         "",
-        response_model=UserResponse,
+        response_model=UserPrivate,
         status_code=status.HTTP_201_CREATED
 )
 async def crear_usuario(
@@ -59,7 +95,10 @@ async def crear_usuario(
 
     nuevo_usuario = models.User(
         username=user.username,
-        email=user.email
+        nombre=user.nombre,
+        apellidos=user.apellidos,
+        email=user.email,
+        password_hash=hash_password(user.password)
     )
 
     db.add(nuevo_usuario)
@@ -69,16 +108,25 @@ async def crear_usuario(
     return nuevo_usuario
 
 
+def _verificar_propietario(uid: int, current_user: models.User) -> None:
+    if current_user.uid != uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permiso para modificar este usuario."
+        )
+
+
 @router.patch(
     "/{uid}",
-    response_model=UserResponse
+    response_model=UserPrivate
 )
 async def actualizar_usuario(
     uid: int,
     usuario: UserUpdate,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    usuario_a_cambiar = await validar_usuario_por_id(uid, db)
+    _verificar_propietario(uid, current_user)
     cambios = usuario.model_dump(exclude_unset=True)
 
     if not cambios:
@@ -91,11 +139,11 @@ async def actualizar_usuario(
         await validar_email_usuario(cambios["email"], db, uid)
 
     for campo, valor in cambios.items():
-            setattr(usuario_a_cambiar, campo, valor)
-    
+            setattr(current_user, campo, valor)
+
     await db.commit()
-    await db.refresh(usuario_a_cambiar)
-    return usuario_a_cambiar
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.delete(
@@ -104,9 +152,10 @@ async def actualizar_usuario(
 )
 async def eliminar_usuario(
     uid: int,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    usuario_a_eliminar = await validar_usuario_por_id(uid, db)
+    _verificar_propietario(uid, current_user)
 
-    await db.delete(usuario_a_eliminar)
+    await db.delete(current_user)
     await db.commit()

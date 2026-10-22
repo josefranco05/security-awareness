@@ -1,0 +1,36 @@
+[project]
+name = "security-awareness"
+version = "0.1.0"
+description = "Plataforma de simulación y detección de phishing dirigida a pequeñas y medianas empresas."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "josemfran05", email = "josefranco0502@outlook.com" }]
+requires-python = ">=3.14"
+dependencies = [
+    # Web
+    "fastapi[standard]>=0.141",
+    "uvicorn[standard]>=0.53",
+    "gunicorn>=26.0",
+    "starlette>=1.6",
+    "pydantic>=2.13",
+    "jinja2>=3.1",
+    "itsdangerous>=2.2",
+    "python-dotenv>=1.2",
+    # Base de datos
+    "sqlalchemy[asyncio]>=2.0.54",
+    "aiosqlite>=0.22",
+    # Worker / colas
+    "celery[redis]>=5.6,<6",
+    "redis>=5,<7",
+    # Correo (Azure Communication Services)
+    "azure-communication-email>=1.0,<2",
+    # Autenticación
+    "pwdlib[argon2]",
+    "pyjwt",
+    "pydantic-settings>=2.16.0",
+]
+
+[tool.uv]
+# Aplicación (no librería): no se construye ni instala como paquete.
+package = false
