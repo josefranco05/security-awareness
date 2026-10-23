@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block title %}Crear cuenta · Security Awareness{% endblock %}
+{% block body_class %}register-page{% endblock %}
+{% block navbar_end %}{% endblock %}
+
+{% block head %}
+<style>
+    .register-page .main {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 64px);
+    }
+
+    .register-card {
+        width: 100%;
+        max-width: 560px;
+    }
+
+    .register-card form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .register-links {
+        margin-top: 1.25rem;
+        text-align: center;
+        font-size: .88rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="card register-card" aria-labelledby="register-title">
+    <div class="card-header">
+        <div>
+            <h1 class="card-title" id="register-title">Crear cuenta</h1>
+            <p class="card-subtitle">Regístrate en Security Awareness</p>
+        </div>
+    </div>
+
+    <form id="registerForm">
+        <div class="form-group">
+            <label for="username">Usuario</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                autocomplete="username"
+                maxlength="50"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="nombre">Nombre</label>
+            <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                autocomplete="given-name"
+                maxlength="100"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="apellidos">Apellidos</label>
+            <input
+                type="text"
+                id="apellidos"
+                name="apellidos"
+                autocomplete="family-name"
+                maxlength="100"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="email">Correo electrónico</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                autocomplete="email"
+                maxlength="50"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="password">Contraseña</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                autocomplete="new-password"
+                minlength="15"
+                required
+                aria-describedby="password-help"
+            >
+            <small id="password-help">Debe tener al menos 15 caracteres.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="password-confirmation">Confirmar contraseña</label>
+            <input
+                type="password"
+                id="password-confirmation"
+                name="password_confirmation"
+                autocomplete="new-password"
+                required
+                aria-describedby="password-confirmation-help"
+            >
+            <small id="password-confirmation-help">Escribe nuevamente tu contraseña.</small>
+        </div>
+
+        <button type="submit" id="registerSubmit" class="btn btn-primary btn-block">Crear cuenta</button>
+    </form>
+
+    <div class="register-links">
+        <a href="{{ url_for('login') }}">¿Ya tienes una cuenta? Inicia sesión</a>
+    </div>
+</section>
+
+<div class="modal" id="registerSuccessModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="registerSuccessTitle">
+        <div class="modal-header">
+            <h2 class="card-title text-success" id="registerSuccessTitle">Cuenta creada</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-success" role="status">
+            <p class="alert-text">Tu cuenta se creó correctamente. Ya puedes iniciar sesión.</p>
+        </div>
+        <div class="modal-actions">
+            <a class="btn btn-primary" href="{{ url_for('login') }}">Iniciar sesión</a>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="registerErrorModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="registerErrorTitle">
+        <div class="modal-header">
+            <h2 class="card-title text-danger" id="registerErrorTitle">No se pudo crear la cuenta</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-danger" role="alert">
+            <p class="alert-text" id="registerErrorMessage"></p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-modal-close>Volver al formulario</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var form = document.getElementById("registerForm");
+        var password = document.getElementById("password");
+        var confirmation = document.getElementById("password-confirmation");
+        var submitButton = document.getElementById("registerSubmit");
+        var isSubmitting = false;
+
+        function validatePasswordConfirmation() {
+            confirmation.setCustomValidity(
+                confirmation.value === password.value
+                    ? ""
+                    : "Las contraseñas no coinciden."
+            );
+        }
+
+        password.addEventListener("input", validatePasswordConfirmation);
+        confirmation.addEventListener("input", validatePasswordConfirmation);
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            validatePasswordConfirmation();
+            if (!form.reportValidity() || isSubmitting) {
+                return;
+            }
+
+            isSubmitting = true;
+            submitButton.disabled = true;
+            submitButton.textContent = "Creando cuenta...";
+
+            var payload = {
+                username: form.elements.username.value.trim(),
+                nombre: form.elements.nombre.value.trim(),
+                apellidos: form.elements.apellidos.value.trim(),
+                email: form.elements.email.value.trim(),
+                password: password.value
+            };
+
+            try {
+                var response = await fetch("/api/usuarios", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                var result = await response.json().catch(function () {
+                    return {};
+                });
+
+                if (!response.ok) {
+                    var message = typeof getErrorMessage === "function"
+                        ? getErrorMessage(result)
+                        : (result.detail || "No se pudo crear la cuenta. Inténtalo nuevamente.");
+                    document.getElementById("registerErrorMessage").textContent = message;
+                    showModal("registerErrorModal");
+                    return;
+                }
+
+                form.reset();
+                showModal("registerSuccessModal");
+            } catch (error) {
+                document.getElementById("registerErrorMessage").textContent =
+                    error.message || "No se pudo conectar con el servidor. Inténtalo nuevamente.";
+                showModal("registerErrorModal");
+            } finally {
+                isSubmitting = false;
+                submitButton.disabled = false;
+                submitButton.textContent = "Crear cuenta";
+            }
+        });
+    })();
+</script>
+{% endblock %}

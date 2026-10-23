@@ -225,10 +225,14 @@ async def forgot_password(request: Request):
     pass
 
 
-@app.get("/login", name="login", include_in_schema=False)
-async def login_form(request: Request):
+@app.get("/login", include_in_schema=False)
+async def login_usuarios(request: Request):
     return templates.TemplateResponse(request, "login.html", {})
 
+
+@app.get("/registro", include_in_schema=False)
+async def registro_usuarios(request: Request):
+    return templates.TemplateResponse(request, "register.html", {})
 
 
 @app.exception_handler(StarletteHTTPException)
