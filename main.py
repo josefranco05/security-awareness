@@ -37,6 +37,7 @@ import logging
 import models
 from database.async_database import Base, engine, get_db
 from routers import campañas as campañas_router, empleados, simulaciones, webhooks, usuarios
+from core.auth import get_current_user
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -72,6 +73,7 @@ app = FastAPI(
     title="Sentinel - The Plague",
 )
 
+
 # Sesión en cookie (para los mensajes flash)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
@@ -80,9 +82,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
-app.include_router(simulaciones.router, prefix="/api/simulaciones", tags=["simulaciones"])
-app.include_router(empleados.router, prefix="/api/empleados", tags=["empleados"])
-app.include_router(campañas_router.router, prefix="/api/campañas", tags=["campañas"])
+# Rutas protegidas: requieren un JWT válido (Authorization: Bearer <token>)
+auth_required = [Depends(get_current_user)]
+app.include_router(simulaciones.router, prefix="/api/simulaciones", tags=["simulaciones"], dependencies=auth_required)
+app.include_router(empleados.router, prefix="/api/empleados", tags=["empleados"], dependencies=auth_required)
+app.include_router(campañas_router.router, prefix="/api/campañas", tags=["campañas"], dependencies=auth_required)
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 

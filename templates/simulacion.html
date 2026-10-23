@@ -860,7 +860,7 @@
             };
 
             try {
-                var response = await fetch("/api/campañas", {
+                var response = await Auth.fetch("/api/campañas", {
                     method: "POST",
                     headers: {
                         "Accept": "application/json",

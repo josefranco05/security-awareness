@@ -364,7 +364,7 @@
                 var empleadoData = Object.fromEntries(new FormData(agregarForm).entries());
 
                 try {
-                    var response = await fetch(apiEmpleados, {
+                    var response = await Auth.fetch(apiEmpleados, {
                         method: "POST",
                         headers: {
                             "Accept": "application/json",
@@ -394,7 +394,7 @@
                 delete empleadoData.eeid;
 
                 try {
-                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                    var response = await Auth.fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
                         method: "PATCH",
                         headers: {
                             "Accept": "application/json",
@@ -421,7 +421,7 @@
                 var eeid = new FormData(eliminarForm).get("eeid");
 
                 try {
-                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                    var response = await Auth.fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
                         method: "DELETE",
                         headers: { "Accept": "application/json" }
                     });
@@ -452,7 +452,7 @@
                 boton.disabled = true;
 
                 try {
-                    var response = await fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
+                    var response = await Auth.fetch(apiEmpleados + "/" + encodeURIComponent(eeid), {
                         method: "PATCH",
                         headers: {
                             "Accept": "application/json",

@@ -54,6 +54,7 @@ async def login_for_access_token(
         response_model=list[UserPublic]
 )
 async def get_usuarios(
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.scalars(
@@ -69,6 +70,7 @@ async def get_usuarios(
 )
 async def get_usuario(
     uid: int,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     usuario = await db.scalar(

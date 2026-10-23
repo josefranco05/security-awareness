@@ -631,7 +631,7 @@
             mostrarFeedback("");
 
             try {
-                var response = await fetch(
+                var response = await Auth.fetch(
                     "/api/campañas/" + encodeURIComponent(camid) + "/enviar",
                     { method: "POST", headers: { "Accept": "application/json" } }
                 );
@@ -668,7 +668,7 @@
             button.textContent = "Eliminando…";
 
             try {
-                var response = await fetch("/api/campañas/" + encodeURIComponent(campaignId), {
+                var response = await Auth.fetch("/api/campañas/" + encodeURIComponent(campaignId), {
                     method: "DELETE",
                     headers: { "Accept": "application/json" }
                 });

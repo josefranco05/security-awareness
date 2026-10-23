@@ -124,12 +124,31 @@
         global.location.assign("/");
     }
 
+    async function authFetch(url, options) {
+        options = options || {};
+        var headers = new Headers(options.headers || {});
+        var token = getToken();
+        if (token) {
+            headers.set("Authorization", "Bearer " + token);
+        }
+
+        var response = await global.fetch(url, Object.assign({}, options, { headers: headers }));
+
+        if (response.status === 401) {
+            global.localStorage.removeItem(TOKEN_KEY);
+            clearUserCache();
+            global.location.assign("/login");
+        }
+        return response;
+    }
+
     global.Auth = Object.freeze({
         getCurrentUser: getCurrentUser,
         getToken: getToken,
         setToken: setToken,
         clearUserCache: clearUserCache,
-        logout: logout
+        logout: logout,
+        fetch: authFetch
     });
 
     global.addEventListener("storage", function (event) {
