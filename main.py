@@ -115,7 +115,11 @@ templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
 # RUTAS
 @app.get("/", name="home", include_in_schema=False)
-@app.get("/home", name="dashboard", include_in_schema=False)
+async def landing(request: Request):
+    return templates.TemplateResponse(request, "landing.html", {})
+
+
+@app.get("/dashboard", name="dashboard", include_in_schema=False)
 async def dashboard(request: Request):
     stats = {
         "empleados": 48,
@@ -225,12 +229,12 @@ async def forgot_password(request: Request):
     pass
 
 
-@app.get("/login", include_in_schema=False)
+@app.get("/login", name="login_page", include_in_schema=False)
 async def login_usuarios(request: Request):
     return templates.TemplateResponse(request, "login.html", {})
 
 
-@app.get("/registro", include_in_schema=False)
+@app.get("/registro", name="register_page", include_in_schema=False)
 async def registro_usuarios(request: Request):
     return templates.TemplateResponse(request, "register.html", {})
 

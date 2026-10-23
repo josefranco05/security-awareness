@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}Security Awareness · PYMEs{% endblock %}
+
+{% block body_class %}landing-page{% endblock %}
+
+{% block head %}
+<style>
+    .landing-page .navbar-end {
+        margin-left: auto;
+    }
+    .landing-hero {
+        max-width: 640px;
+        margin: 4rem auto;
+        text-align: center;
+    }
+    .landing-hero p {
+        color: var(--text-secondary);
+        margin: 1rem 0 2rem;
+    }
+    .landing-actions {
+        display: flex;
+        justify-content: center;
+        gap: .75rem;
+        flex-wrap: wrap;
+    }
+</style>
+{% endblock %}
+
+{# Navbar reducido: solo marca + acceso #}
+{% block navbar %}
+<header class="navbar">
+    <div class="navbar-inner">
+        <a class="brand" href="{{ url_for('home') }}" data-auth-href="{{ url_for('dashboard') }}">
+            <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true">
+                <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor" />
+                <path d="M9 12l2 2 4-4" stroke="#0a1526" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+            </svg>
+            <span class="brand-name">Security Awareness</span>
+            <span class="brand-tag">PYMEs</span>
+        </a>
+
+        <div class="navbar-end">
+            <a class="btn btn-secondary btn-sm" href="{{ url_for('register_page') }}">Registro</a>
+            <a class="btn btn-primary btn-sm" href="{{ url_for('login_page') }}">Iniciar sesión</a>
+        </div>
+    </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<section class="landing-hero">
+    <h1>Security Awareness para PYMEs</h1>
+    <p>Detecta correos de phishing, simula campañas y capacita a tus empleados desde un solo lugar.</p>
+    <div class="landing-actions">
+        <a class="btn btn-primary" href="{{ url_for('login_page') }}">Iniciar sesión</a>
+        <a class="btn btn-secondary" href="{{ url_for('register_page') }}">Crear cuenta</a>
+    </div>
+</section>
+{% endblock %}

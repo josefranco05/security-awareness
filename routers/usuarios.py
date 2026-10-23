@@ -38,7 +38,7 @@ async def get_usuario_actual(current_user: CurrentUser):
         "/token",
         response_model=Token
 )
-async def login(
+async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[AsyncSession, Depends(get_db)]
 ):

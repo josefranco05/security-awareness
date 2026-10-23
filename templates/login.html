@@ -4,8 +4,8 @@
 
 {% block body_class %}login-page{% endblock %}
 
-{# En la página de login no mostramos el botón "Iniciar sesión" del navbar #}
-{% block navbar_end %}{% endblock %}
+{# En la página de login no mostramos el navbar #}
+{% block navbar %}{% endblock %}
 
 {% block head %}
 <style>
@@ -44,7 +44,11 @@
         </div>
     </div>
 
-    <form method="post" action="{{ url_for('login') }}">
+    <div class="alert alert-danger" id="loginError" role="alert" hidden>
+        <span class="alert-text" id="loginErrorMessage"></span>
+    </div>
+
+    <form id="loginForm">
         <div class="form-group">
             <label for="username">Usuario</label>
             <input type="text" id="username" name="username"
@@ -59,7 +63,7 @@
                    required>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-block">Iniciar sesión</button>
+        <button type="submit" id="loginSubmit" class="btn btn-primary btn-block">Iniciar sesión</button>
     </form>
 
     <div class="login-links">
@@ -68,4 +72,70 @@
         <a href="mailto:soporte@securityawareness.co">¿Necesitas ayuda?</a>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var form = document.getElementById("loginForm");
+        var submitButton = document.getElementById("loginSubmit");
+        var errorBox = document.getElementById("loginError");
+        var errorMessage = document.getElementById("loginErrorMessage");
+        var isSubmitting = false;
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorBox.hidden = false;
+        }
+
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            if (!form.reportValidity() || isSubmitting) {
+                return;
+            }
+
+            isSubmitting = true;
+            errorBox.hidden = true;
+            submitButton.disabled = true;
+            submitButton.textContent = "Iniciando sesión...";
+
+            // OAuth2PasswordRequestForm espera form-urlencoded, no JSON.
+            var body = new URLSearchParams({
+                username: form.elements.username.value.trim(),
+                password: form.elements.password.value
+            });
+
+            try {
+                var response = await fetch("/api/usuarios/token", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: body
+                });
+                var result = await response.json().catch(function () {
+                    return {};
+                });
+
+                if (!response.ok) {
+                    showError(typeof getErrorMessage === "function"
+                        ? getErrorMessage(result)
+                        : (result.detail || "No se pudo iniciar sesión. Inténtalo nuevamente."));
+                    return;
+                }
+
+                Auth.setToken(result.access_token);
+                window.location.assign("{{ url_for('dashboard') }}");
+            } catch (error) {
+                showError(error.message || "No se pudo conectar con el servidor. Inténtalo nuevamente.");
+            } finally {
+                isSubmitting = false;
+                submitButton.disabled = false;
+                submitButton.textContent = "Iniciar sesión";
+            }
+        });
+    })();
+</script>
 {% endblock %}

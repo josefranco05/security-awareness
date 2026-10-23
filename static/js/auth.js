@@ -121,7 +121,7 @@
     function logout() {
         clearUserCache();
         global.localStorage.removeItem(TOKEN_KEY);
-        global.location.assign("/login");
+        global.location.assign("/");
     }
 
     global.Auth = Object.freeze({

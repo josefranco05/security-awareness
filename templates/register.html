@@ -2,7 +2,7 @@
 
 {% block title %}Crear cuenta · Security Awareness{% endblock %}
 {% block body_class %}register-page{% endblock %}
-{% block navbar_end %}{% endblock %}
+{% block navbar %}{% endblock %}
 
 {% block head %}
 <style>
@@ -121,7 +121,7 @@
     </form>
 
     <div class="register-links">
-        <a href="{{ url_for('login') }}">¿Ya tienes una cuenta? Inicia sesión</a>
+        <a href="{{ url_for('login_page') }}">¿Ya tienes una cuenta? Inicia sesión</a>
     </div>
 </section>
 
@@ -136,7 +136,7 @@
             <p class="alert-text">Tu cuenta se creó correctamente. Ya puedes iniciar sesión.</p>
         </div>
         <div class="modal-actions">
-            <a class="btn btn-primary" href="{{ url_for('login') }}">Iniciar sesión</a>
+            <a class="btn btn-primary" href="{{ url_for('login_page') }}">Iniciar sesión</a>
         </div>
     </div>
 </div>

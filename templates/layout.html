@@ -19,10 +19,12 @@
     <div class="app">
 
         <!-- ===================== Navbar ===================== -->
+        {# Sobrescribe este bloque vacío para ocultar el navbar (p. ej. login/registro). #}
+        {% block navbar %}
         <header class="navbar">
             <div class="navbar-inner">
 
-                <a class="brand" href="{{ url_for('dashboard') }}">
+                <a class="brand" href="{{ url_for('home') }}" data-auth-href="{{ url_for('dashboard') }}">
                     <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
                         aria-hidden="true">
                         <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor" />
@@ -54,15 +56,15 @@
 
                 <div class="navbar-end">
                     {% block navbar_end %}
-                    {# Zona de sesión. Sobrescríbela cuando tengas login:
-                    <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Iniciar sesión</a>
-                    o muestra el usuario actual + logout. #}
-                    <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Iniciar sesión</a>
+                    {# Zona de sesión: usuario actual (se rellena con Auth.getCurrentUser) + logout #}
+                    <span class="nav-user text-muted" id="navUser" hidden></span>
+                    <button type="button" class="btn btn-secondary btn-sm" id="logoutButton">Cerrar sesión</button>
                     {% endblock %}
                 </div>
 
             </div>
         </header>
+        {% endblock %}
 
         <!-- ===================== Flash messages ===================== -->
         {% block flash %}
@@ -119,6 +121,32 @@
 
     <script src="{{ url_for('static', path='js/utils.js') }}"></script>
     <script src="{{ url_for('static', path='js/auth.js') }}"></script>
+    <script>
+        // Sesión en el navbar: nombre de usuario, cerrar sesión y destino del logo
+        (function () {
+            var logoutButton = document.getElementById('logoutButton');
+            var navUser = document.getElementById('navUser');
+            // El logo apunta al landing por defecto; con sesión válida va a data-auth-href (dashboard)
+            var brandLinks = document.querySelectorAll('.brand[data-auth-href]');
+
+            if (logoutButton) {
+                logoutButton.addEventListener('click', function () {
+                    Auth.logout();
+                });
+            }
+
+            Auth.getCurrentUser().then(function (user) {
+                if (!user) return;
+                brandLinks.forEach(function (link) {
+                    link.href = link.getAttribute('data-auth-href');
+                });
+                if (navUser) {
+                    navUser.textContent = user.username;
+                    navUser.hidden = false;
+                }
+            }).catch(function () { });
+        })();
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>
