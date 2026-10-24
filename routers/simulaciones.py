@@ -32,17 +32,17 @@ async def get_all_simulaciones(
 
 
 @router.get(
-    "/{cam_id}",
+    "/{camid}",
     response_model=list[SimulacionResponse],
 )
 async def get_simulaciones_por_campaña(
-    cam_id: int,
+    camid: int,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    await validar_campaña(cam_id, db)
+    await validar_campaña(camid, db)
 
     result = await db.scalars(
-        select(models.Simulaciones).where(models.Simulaciones.campana_id == cam_id)
+        select(models.Simulaciones).where(models.Simulaciones.campana_id == camid)
     )
     simulaciones = result.all()
     return simulaciones

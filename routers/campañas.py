@@ -8,6 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
+from core.auth import CurrentUser
 from database.async_database import get_db
 from schemas.campañas import CampañaCreate, CampañaResponse
 from worker.tasks import enviar_campaña
@@ -60,6 +61,7 @@ async def get_campaña_por_id(
 )
 async def crear_campaña(
     campaña: CampañaCreate,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     ee_ids = list(dict.fromkeys(u_id for u_id in campaña.destinatarios))
@@ -68,8 +70,6 @@ async def crear_campaña(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Simulacion invalida. Ningun empleado ha sido seleccionado."
         )
-
-    current_user_id = 1
 
     result = await db.scalars(
         select(models.Empleados)
@@ -86,7 +86,7 @@ async def crear_campaña(
 
     datos_campaña = campaña.model_dump(exclude={"destinatarios"})
     nueva_campaña = models.Campaña(
-        owner=current_user_id,
+        owner=current_user.uid,
         **datos_campaña,
     )
 
