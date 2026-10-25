@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="{{ tema_actual() }}">
 
 <head>
     <meta charset="UTF-8">
@@ -75,11 +75,10 @@
                 {% block navbar_end %}
                 {# Usuario actual (se rellena con Auth.getCurrentUser) #}
                 <span class="nav-user text-muted" id="navUser" hidden></span>
-                {# TODO: enlazar a la página de configuración de la cuenta cuando exista. #}
-                <button type="button" class="icon-btn" id="accountButton" aria-label="Mi cuenta"
-                    title="Configuración de la cuenta (próximamente)">
+                <a class="icon-btn {% if active_page == 'cuenta' %}active{% endif %}" id="accountButton"
+                    href="{{ url_for('cuenta') }}" aria-label="Mi cuenta" title="Configuración de la cuenta">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M6.2 18.4a7 7 0 0 1 11.6 0" /></svg>
-                </button>
+                </a>
                 <button type="button" class="btn btn-secondary btn-sm" id="logoutButton">
                     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
                     Cerrar sesión

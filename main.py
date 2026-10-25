@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Literal
 from datetime import datetime, UTC
 from contextlib import asynccontextmanager
 
@@ -183,6 +183,20 @@ def get_flashed_messages(with_categories: bool = False):
 templates.env.globals["get_flashed_messages"] = get_flashed_messages
 
 
+# Tema claro/oscuro: vive en una cookie del navegador y el servidor lo pinta en
+# <html data-theme>, así la página llega ya con el tema correcto (sin parpadeo).
+TEMA_COOKIE = "tema"
+Tema = Literal["light", "dark"]
+
+
+def tema_actual() -> str:
+    tema = _request_ctx.get().cookies.get(TEMA_COOKIE)
+    return tema if tema in ("light", "dark") else "light"
+
+
+templates.env.globals["tema_actual"] = tema_actual
+
+
 # RUTAS
 @app.get("/", name="home", include_in_schema=False)
 async def landing(request: Request):
@@ -299,6 +313,51 @@ async def simulacion(request: Request, current_user: CurrentUser, db: Annotated[
     )
     empleados = results.all()
     return templates.TemplateResponse(request, "simulacion.html", {"employees": empleados})
+
+
+@app.get("/cuenta", name="cuenta", include_in_schema=False)
+async def cuenta(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    # Conteos para que el modal de borrado diga exactamente qué se pierde.
+    campañas = await db.scalar(
+        select(func.count())
+        .select_from(models.Campaña)
+        .where(models.Campaña.owner == current_user.uid)
+    )
+    empleados = await db.scalar(
+        select(func.count())
+        .select_from(models.Empleados)
+        .where(models.Empleados.owner == current_user.uid)
+    )
+    simulaciones = await db.scalar(
+        select(func.count())
+        .select_from(models.Simulaciones)
+        .join(models.Simulaciones.campana)
+        .where(models.Campaña.owner == current_user.uid)
+    )
+    return templates.TemplateResponse(
+        request,
+        "cuenta.html",
+        {
+            "usuario": current_user,
+            "conteos": {"campanas": campañas, "empleados": empleados, "simulaciones": simulaciones},
+        },
+    )
+
+
+@app.post("/cuenta/tema", name="cambiar_tema", include_in_schema=False)
+async def cambiar_tema(request: Request, current_user: CurrentUser, tema: Annotated[Tema, Form()]):
+    # Un valor fuera de light/dark lo rechaza la validación (422).
+    response = RedirectResponse(str(request.url_for("cuenta")), status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        TEMA_COOKIE,
+        tema,
+        max_age=60 * 60 * 24 * 365,
+        httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @app.get("/recuperar-contrasena", name="forgot_password", include_in_schema=False)

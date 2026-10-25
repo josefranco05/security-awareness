@@ -42,6 +42,15 @@
     --danger-line: #f1b8b8;
     --info: #2f74d0;
     --info-soft: #e7f0fc;
+    --danger-strong: #b52f2f;
+
+    /* Texto sobre rellenos de color (botones, activo, seleccionado) */
+    --on-accent: #fff;
+
+    /* Superficies compuestas */
+    --bg-glass: rgba(255, 255, 255, .85);
+    --sidebar-bg: linear-gradient(180deg, #fff 0%, #f1f7fd 55%, var(--mint-soft) 100%);
+    --progress-rest: #c9dcf3;
 
     /* Geometría y efectos */
     --radius: 12px;
@@ -59,6 +68,56 @@
     --rail-open: 232px;
     --topbar: 60px;
     --gutter: clamp(1rem, 2.5vw, 2.5rem);
+
+    color-scheme: light;
+}
+
+/* Tema oscuro: solo redefine variables. El servidor pone data-theme en <html>. */
+:root[data-theme="dark"] {
+    --bg-page: #0f1724;
+    --bg-surface: #162132;
+    --bg-surface-2: #1a2739;
+    --bg-elevated: #1f2e44;
+    --bg-input: #121c2b;
+
+    --border: #26374f;
+    --border-soft: #1f2e44;
+    --border-strong: #34496a;
+
+    --primary: #6ea8f5;
+    --primary-strong: #9cc4fa;
+    --primary-soft: #1e3554;
+    --primary-glow: rgba(110, 168, 245, .25);
+    --mint: #2a5a48;
+    --mint-soft: #173328;
+    --mint-strong: #5fc79c;
+    --accent: #7ad3ab;
+
+    --text: #e4ecf5;
+    --text-secondary: #b3c2d4;
+    --text-muted: #8c9db2;
+
+    --success: #7ad3ab;
+    --success-soft: #173328;
+    --warning: #f0bd6a;
+    --warning-soft: #33281a;
+    --danger: #ef7b7b;
+    --danger-soft: #3a1f24;
+    --danger-line: #6b3036;
+    --danger-strong: #f49a9a;
+    --info: #6ea8f5;
+    --info-soft: #1a2b44;
+
+    --on-accent: #0f1724;
+
+    --bg-glass: rgba(22, 33, 50, .85);
+    --sidebar-bg: linear-gradient(180deg, #162132 0%, #142030 60%, #13261f 100%);
+    --progress-rest: #2c4262;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+
+    color-scheme: dark;
 }
 
 /* ------------------------------------------------------------
@@ -221,7 +280,7 @@ img {
     width: var(--rail);
     padding: 1rem .75rem;
     overflow: hidden;
-    background: linear-gradient(180deg, #fff 0%, #f1f7fd 55%, var(--mint-soft) 100%);
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
     transition: width .2s ease, box-shadow .2s ease;
 }
@@ -280,7 +339,7 @@ img {
 .nav-link.active {
     background: var(--primary);
     box-shadow: 0 4px 12px rgba(47, 116, 208, .28);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 /* ------------------------------------------------------------
@@ -295,7 +354,7 @@ img {
     gap: .75rem;
     height: var(--topbar);
     padding: 0 var(--gutter);
-    background: rgba(255, 255, 255, .85);
+    background: var(--bg-glass);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
@@ -327,7 +386,8 @@ img {
     transition: background var(--ease), color var(--ease), border-color var(--ease);
 }
 
-.icon-btn:hover {
+.icon-btn:hover,
+.icon-btn.active {
     background: var(--primary-soft);
     border-color: var(--primary-soft);
     color: var(--primary-strong);
@@ -345,7 +405,7 @@ img {
     position: sticky;
     top: 0;
     z-index: 50;
-    background: rgba(255, 255, 255, .85);
+    background: var(--bg-glass);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
@@ -545,12 +605,12 @@ img {
 .btn-primary {
     background: var(--primary);
     box-shadow: 0 4px 12px rgba(47, 116, 208, .25);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .btn-primary:hover {
     background: var(--primary-strong);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .btn-secondary {
@@ -578,12 +638,12 @@ img {
 
 .btn-danger {
     background: var(--danger);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .btn-danger:hover {
-    background: #b52f2f;
-    color: #fff;
+    background: var(--danger-strong);
+    color: var(--on-accent);
 }
 
 .btn-sm {
@@ -1238,7 +1298,7 @@ input[type="checkbox"] {
 .ee-item.is-selected .ee-avatar {
     background: var(--primary);
     border-color: var(--primary);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .ee-info,
@@ -1465,7 +1525,7 @@ input[type="checkbox"] {
 .rte-btn.active {
     background: var(--primary);
     border-color: var(--primary);
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .rte-u {
@@ -1523,13 +1583,16 @@ input[type="checkbox"] {
     cursor: pointer;
 }
 
+/* Siempre claro, también en tema oscuro: es la vista previa de un correo que
+   el destinatario leerá sobre fondo blanco. */
 .rte-editor {
     min-height: 280px;
     padding: 1.3rem;
-    background: var(--bg-surface);
+    background: #fff;
     border: 1px solid var(--border);
     border-radius: 0 0 var(--radius) var(--radius);
-    color: var(--text);
+    color: #1e2b3c;
+    color-scheme: light;
     font-size: .95rem;
     line-height: 1.6;
     outline: none;
@@ -1546,15 +1609,15 @@ input[type="checkbox"] {
 }
 
 .rte-editor a {
-    color: var(--primary);
+    color: #2f74d0;
     text-decoration: underline;
 }
 
 .rte-editor blockquote {
     margin: .75rem 0;
     padding-left: .9rem;
-    border-left: 3px solid var(--border);
-    color: var(--text-secondary);
+    border-left: 3px solid #dfe8f2;
+    color: #46596f;
 }
 
 .rte-source {
@@ -1979,7 +2042,7 @@ input[type="file"]::file-selector-button:hover {
 .date-picker-day.is-selected:hover {
     background: var(--primary);
     box-shadow: none;
-    color: #fff;
+    color: var(--on-accent);
 }
 
 .date-picker-footer {
@@ -2119,7 +2182,7 @@ input[type="file"]::file-selector-button:hover {
 
 .progress-bar-rest,
 .legend-dot-rest {
-    background: #c9dcf3;
+    background: var(--progress-rest);
 }
 
 .campaign-legend {
@@ -2239,7 +2302,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* Mensaje de la activación de campañas (lo inserta el JS de campañas.html). */
-.campaign-feedback {
+.campaign-feedback,
+.feedback {
     margin: 0 0 .9rem;
     padding: .6rem .85rem;
     border: 1px solid var(--border);
@@ -2248,14 +2312,79 @@ input[type="file"]::file-selector-button:hover {
     line-height: 1.5;
 }
 
-.campaign-feedback.is-ok {
+.campaign-feedback.is-ok,
+.feedback.is-ok {
     background: var(--success-soft);
     border-color: var(--mint);
     color: var(--success);
 }
 
-.campaign-feedback.is-error {
+.campaign-feedback.is-error,
+.feedback.is-error {
     background: var(--danger-soft);
     border-color: var(--danger-line);
     color: var(--danger);
+}
+
+/* ============================================================
+   Mi cuenta (cuenta.html)
+   ============================================================ */
+.account-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    align-items: start;
+    gap: 1rem;
+}
+
+/* Selector de dos opciones (tema): botones submit de un form normal. */
+.segmented {
+    display: inline-flex;
+    gap: .25rem;
+    padding: .25rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+
+.segmented button {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem 1rem;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font: 600 .9rem var(--font);
+    cursor: pointer;
+    transition: background var(--ease), color var(--ease);
+}
+
+.segmented button .icon {
+    width: 17px;
+    height: 17px;
+}
+
+.segmented button:hover {
+    color: var(--text);
+}
+
+.segmented button[aria-pressed="true"] {
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+    color: var(--primary);
+}
+
+.card-danger {
+    border-color: var(--danger-line);
+}
+
+.card-danger .card-title {
+    color: var(--danger);
+}
+
+@media (max-width: 900px) {
+    .account-grid {
+        grid-template-columns: 1fr;
+    }
 }
