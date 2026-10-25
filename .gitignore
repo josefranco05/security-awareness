@@ -19,10 +19,8 @@ ENV/
 # ---------------------------------------------------------------------------
 # Secretos y configuración local
 # ---------------------------------------------------------------------------
-# OJO: .env YA está rastreado en este repositorio (contiene SECRET_KEY).
-# Añadirlo aquí no lo destrackea por sí solo. Para dejar de versionarlo:
-#     git rm --cached .env
-#     git commit -m "Dejar de versionar .env"
+# Los secretos nunca se versionan. Copiar .env.example a .env y rellenarlo;
+# en Azure se configuran como App Settings del Web App.
 .env
 .env.*
 !.env.example
