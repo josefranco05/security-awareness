@@ -7,22 +7,6 @@ import models
 
 
 # VALIDACIONES DE EMPLEADO
-async def validar_empleado_por_id(
-        eeid: int, 
-        db: AsyncSession
-    ):
-    result = await db.scalars(
-        select(models.Empleados).where(models.Empleados.eeid == eeid)
-    )
-    empleado = result.first()
-    if not empleado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró un empleado con id {eeid}"
-        )
-    return empleado
-
-
 async def validar_email_empleado(
         email: str,
         owner_id: int,

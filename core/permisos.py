@@ -63,6 +63,18 @@ async def get_campaña_propia(
 CampañaPropia = Annotated[models.Campaña, Depends(get_campaña_propia)]
 
 
+# EMPLEADOS
+async def get_empleado_propio(
+    eeid: int,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> models.Empleados:
+    return await validar_propietario(db, models.Empleados, eeid, current_user)
+
+
+EmpleadoPropio = Annotated[models.Empleados, Depends(get_empleado_propio)]
+
+
 # USUARIOS
 async def get_usuario_propio(uid: int, current_user: CurrentUser) -> models.User:
     """Un usuario solo puede leer o modificar su propia cuenta."""

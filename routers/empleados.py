@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from core.auth import CurrentUser
+from core.permisos import EmpleadoPropio
 from database.async_database import get_db
 from schemas.empleados import EmpleadoResponse, EmpleadoCreate, EmpleadoUpdate
-from utils.validaciones import validar_email_empleado, validar_empleado_por_id
+from utils.validaciones import validar_email_empleado
 
 
 router = APIRouter()
@@ -23,11 +24,13 @@ router = APIRouter()
         response_model=list[EmpleadoResponse]
 )
 async def get_empleados(
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.scalars(
         select(models.Empleados)
         .options(selectinload(models.Empleados.simulaciones))
+        .where(models.Empleados.owner == current_user.uid)
         .order_by(models.Empleados.riesgo.desc())
     )
     empleados = result.all()
@@ -35,20 +38,10 @@ async def get_empleados(
 
 
 @router.get(
-        "/{eeid}", 
+        "/{eeid}",
         response_model=EmpleadoResponse
 )
-async def get_empleado(
-    eeid: int,
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    result = await db.scalars(
-        select(models.Empleados)
-        .options(selectinload(models.Empleados.simulaciones))
-        .where(models.Empleados.eeid == eeid)
-        .order_by(models.Empleados.riesgo.desc())
-    )
-    empleado = result.first()
+async def get_empleado(empleado: EmpleadoPropio):
     return empleado
 
 
@@ -86,13 +79,13 @@ async def agregar_empleado(
     response_model=EmpleadoResponse,
 )
 async def remplazar_empleado(
-    eeid: int,
     empleado: EmpleadoCreate,
+    empleado_a_cambiar: EmpleadoPropio,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    empleado_a_cambiar = await validar_empleado_por_id(eeid, db)
-
-    await validar_email_empleado(empleado.email, empleado_a_cambiar.owner, db, eeid)
+    await validar_email_empleado(
+        empleado.email, empleado_a_cambiar.owner, db, empleado_a_cambiar.eeid
+    )
 
     empleado_a_cambiar.nombre = empleado.nombre
     empleado_a_cambiar.email = empleado.email
@@ -112,11 +105,10 @@ async def remplazar_empleado(
     response_model=EmpleadoResponse,
 )
 async def editar_empleado(
-    eeid: int,
     empleado: EmpleadoUpdate,
+    empleado_a_cambiar: EmpleadoPropio,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    empleado_a_cambiar = await validar_empleado_por_id(eeid, db)
     cambios = empleado.model_dump(exclude_unset=True)
 
     if not cambios:
@@ -126,7 +118,9 @@ async def editar_empleado(
         )    
     
     if cambios.get("email") is not None:
-        await validar_email_empleado(cambios["email"], empleado_a_cambiar.owner, db, eeid)
+        await validar_email_empleado(
+            cambios["email"], empleado_a_cambiar.owner, db, empleado_a_cambiar.eeid
+        )
 
     for campo, valor in cambios.items():
         setattr(empleado_a_cambiar, campo, valor)
@@ -141,10 +135,8 @@ async def editar_empleado(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def eliminar_empleado(
-    eeid: int,
+    empleado: EmpleadoPropio,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    empleado_a_eliminar = await validar_empleado_por_id(eeid, db)
-
-    await db.delete(empleado_a_eliminar)
+    await db.delete(empleado)
     await db.commit()

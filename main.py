@@ -183,26 +183,28 @@ async def ver_empleados(
     db: Annotated[AsyncSession, Depends(get_db)]
     ):
 
+    propios = models.Empleados.owner == current_user.uid
+
     total_ees = await db.scalar(
-        select(func.count()).select_from(models.Empleados)
+        select(func.count()).select_from(models.Empleados).where(propios)
         )
     high_risk = await db.scalar(
         select(func.count())
         .select_from(models.Empleados)
-        .where(models.Empleados.riesgo >= 70)
+        .where(propios, models.Empleados.riesgo >= 70)
         )
     activos = await db.scalar(
         select(func.count())
         .select_from(models.Empleados)
-        .where(models.Empleados.estado == True)
+        .where(propios, models.Empleados.estado == True)
         )
     inactivos = await db.scalar(
         select(func.count())
         .select_from(models.Empleados)
-        .where(models.Empleados.estado == False)
+        .where(propios, models.Empleados.estado == False)
         )
-    
-    result = await db.scalars(select(models.Empleados))
+
+    result = await db.scalars(select(models.Empleados).where(propios))
     all_ees = result.all()
     stats = {
         "total": total_ees,
@@ -263,7 +265,10 @@ async def deteccion(request: Request, current_user: CurrentUser):
         )
 async def simulacion(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     results = await db.scalars(
-        select(models.Empleados).where(models.Empleados.estado == True)
+        select(models.Empleados).where(
+            models.Empleados.owner == current_user.uid,
+            models.Empleados.estado == True,
+        )
     )
     empleados = results.all()
     return templates.TemplateResponse(request, "simulacion.html", {"employees": empleados})

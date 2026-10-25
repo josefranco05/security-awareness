@@ -67,6 +67,7 @@ async def crear_campaña(
     result = await db.scalars(
         select(models.Empleados)
         .where(models.Empleados.eeid.in_(ee_ids),
+               models.Empleados.owner == current_user.uid,
                models.Empleados.estado.is_(True))
     )
     target_empleados = result.all()
@@ -95,12 +96,14 @@ async def crear_campaña(
         ])
         await db.commit()
 
-    except Exception as e:
+    except Exception as exc:
         await db.rollback()
+        # El detalle (SQL, tablas, restricciones) va al log, nunca al cliente.
+        logger.exception("No se pudo crear la campaña del usuario %s", current_user.uid)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al crear la simulacion. Details: {e}"
-        )
+            detail="Error al crear la campaña. Intenta nuevamente."
+        ) from exc
 
     # El encolado va DESPUÉS del commit: si el broker no responde, la campaña
     # queda creada con sus filas en "pending" y el barrido periódico las envía.
