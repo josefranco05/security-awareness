@@ -53,11 +53,26 @@ class Settings(BaseSettings):
     SECRET_KEY_AUTH: SecretStr
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Cookie HttpOnly que transporta el JWT. Si en desarrollo el navegador no
+    # guarda la cookie por usar http, poner AUTH_COOKIE_SECURE=false en el .env.
+    AUTH_COOKIE_NAME: str = "access_token"
+    AUTH_COOKIE_SECURE: bool = True
+
+    # --- Protección CSRF -----------------------------------------------
+    # Orígenes desde los que se aceptan POST/PUT/PATCH/DELETE. En el .env va
+    # como JSON, p. ej.: ALLOWED_ORIGINS='["https://app.sentinel.world"]'
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
 
     @field_validator("EMAIL_BACKEND", mode="before")
     @classmethod
     def _normalizar_backend(cls, valor: object) -> object:
         return valor.strip().lower() if isinstance(valor, str) else valor
+
+    @field_validator("ALLOWED_ORIGINS")
+    @classmethod
+    def _normalizar_origenes(cls, valor: list[str]) -> list[str]:
+        # El navegador envía el Origin sin "/" final y en minúsculas.
+        return [origen.strip().rstrip("/").lower() for origen in valor]
 
     @field_validator("CELERY_TASK_ALWAYS_EAGER", mode="before")
     @classmethod

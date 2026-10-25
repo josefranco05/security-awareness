@@ -37,7 +37,8 @@ import logging
 import models
 from database.async_database import Base, engine, get_db
 from routers import campañas as campañas_router, empleados, simulaciones, webhooks, usuarios
-from core.auth import get_current_user
+from core.auth import get_current_user, CurrentUser, OptionalUser
+from core.config import settings
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -82,7 +83,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
-# Rutas protegidas: requieren un JWT válido (Authorization: Bearer <token>)
+# Rutas protegidas: requieren un JWT válido en la cookie HttpOnly de sesión
 auth_required = [Depends(get_current_user)]
 app.include_router(simulaciones.router, prefix="/api/simulaciones", tags=["simulaciones"], dependencies=auth_required)
 app.include_router(empleados.router, prefix="/api/empleados", tags=["empleados"], dependencies=auth_required)
@@ -102,6 +103,44 @@ async def request_context(request: Request, call_next):
         return await call_next(request)
     finally:
         _request_ctx.reset(token)
+
+
+# Protección CSRF: los métodos que modifican estado solo se aceptan desde
+# nuestros propios orígenes. SameSite=Lax no basta porque los subdominios de
+# sentinel.world cuentan como el mismo "site".
+METODOS_INSEGUROS = {"POST", "PUT", "PATCH", "DELETE"}
+# Event Grid llama servidor a servidor, sin cabecera Origin.
+RUTAS_SIN_ORIGEN = ("/api/webhooks/",)
+
+
+@app.middleware("http")
+async def verificar_origen(request: Request, call_next):
+    # Sin Origin (o con "null") también se rechaza: los navegadores siempre lo
+    # envían en estos métodos, así que su ausencia no es una petición legítima del frontend.
+    if (
+        request.method in METODOS_INSEGUROS
+        and not request.url.path.startswith(RUTAS_SIN_ORIGEN)
+        and request.headers.get("origin") not in settings.ALLOWED_ORIGINS
+    ):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"detail": "Origen de la solicitud no permitido."},
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def cabeceras_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        # Se guardan pero se revalidan siempre (304 por ETag si no cambiaron):
+        # tras un deploy nadie se queda con un auth.js viejo.
+        response.headers.setdefault("Cache-Control", "no-cache")
+    else:
+        # Páginas y API nunca se almacenan: tras el logout, "Atrás" vuelve a
+        # pedir la página al servidor y este redirige a /login.
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 
 def flash(request: Request, message: str, category: str = "info") -> None:
@@ -124,7 +163,7 @@ async def landing(request: Request):
 
 
 @app.get("/dashboard", name="dashboard", include_in_schema=False)
-async def dashboard(request: Request):
+async def dashboard(request: Request, current_user: CurrentUser):
     stats = {
         "empleados": 48,
         "campanas_activas": 2,
@@ -139,7 +178,8 @@ async def dashboard(request: Request):
 
 @app.get("/empleados", name="empleados", include_in_schema=False)
 async def ver_empleados(
-    request: Request, 
+    request: Request,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
     ):
 
@@ -177,7 +217,7 @@ async def ver_empleados(
     )
 
 @app.get("/campañas", name="campañas", include_in_schema=False)
-async def campañas(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
+async def campañas(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.scalars(
         select(models.Campaña)
         .options(
@@ -211,7 +251,7 @@ async def campañas(request: Request, db: Annotated[AsyncSession, Depends(get_db
     )
 
 @app.get("/deteccion", name="deteccion", include_in_schema=False)
-async def deteccion(request: Request):
+async def deteccion(request: Request, current_user: CurrentUser):
     return templates.TemplateResponse(request, "deteccion.html", {})
 
 
@@ -220,7 +260,7 @@ async def deteccion(request: Request):
         name="simulacion", 
         include_in_schema=False
         )
-async def simulacion(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
+async def simulacion(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     results = await db.scalars(
         select(models.Empleados).where(models.Empleados.estado == True)
     )
@@ -234,12 +274,16 @@ async def forgot_password(request: Request):
 
 
 @app.get("/login", name="login_page", include_in_schema=False)
-async def login_usuarios(request: Request):
+async def login_usuarios(request: Request, current_user: OptionalUser):
+    if current_user:
+        return RedirectResponse(str(request.url_for("dashboard")), status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(request, "login.html", {})
 
 
 @app.get("/registro", name="register_page", include_in_schema=False)
-async def registro_usuarios(request: Request):
+async def registro_usuarios(request: Request, current_user: OptionalUser):
+    if current_user:
+        return RedirectResponse(str(request.url_for("dashboard")), status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(request, "register.html", {})
 
 
@@ -250,7 +294,14 @@ async def general_http_exception_handler(
 ):
     if request.url.path.startswith("/api"):
         return await http_exception_handler(request, exception)
-    
+
+    # Páginas HTML sin sesión válida: se envía al login en vez de mostrar el error.
+    if exception.status_code == status.HTTP_401_UNAUTHORIZED:
+        return RedirectResponse(
+            str(request.url_for("login_page")),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
     error_message = (
             exception.detail 
             if exception.detail 

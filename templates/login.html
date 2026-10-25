@@ -113,20 +113,22 @@
                         "Accept": "application/json",
                         "Content-Type": "application/x-www-form-urlencoded"
                     },
+                    credentials: "same-origin",
                     body: body
-                });
-                var result = await response.json().catch(function () {
-                    return {};
                 });
 
                 if (!response.ok) {
+                    var result = await response.json().catch(function () {
+                        return {};
+                    });
                     showError(typeof getErrorMessage === "function"
                         ? getErrorMessage(result)
                         : (result.detail || "No se pudo iniciar sesión. Inténtalo nuevamente."));
                     return;
                 }
 
-                Auth.setToken(result.access_token);
+                // La cookie ya quedó guardada por el navegador; no hay token que manejar.
+                Auth.clearUserCache();
                 window.location.assign("{{ url_for('dashboard') }}");
             } catch (error) {
                 showError(error.message || "No se pudo conectar con el servidor. Inténtalo nuevamente.");

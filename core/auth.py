@@ -1,14 +1,16 @@
 """Autenticación: hash de contraseñas (Argon2) y tokens de acceso (JWT).
 
-Uso previsto desde los routers:
+El JWT viaja únicamente en una cookie HttpOnly: el frontend nunca lo ve.
 
-    from core.auth import CurrentUser, authenticate_user, create_access_token
+Uso previsto desde los routers y las páginas:
+
+    from core.auth import CurrentUser
 
     @router.get("/me")
     async def me(user: CurrentUser): ...
 
-El endpoint que emite tokens debe vivir en `TOKEN_URL` para que el botón
-"Authorize" de /docs funcione.
+Sin sesión válida se lanza un 401. En /api se responde tal cual; en las
+páginas HTML el handler de main.py lo convierte en redirección a /login.
 """
 from __future__ import annotations
 
@@ -16,8 +18,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi.security import APIKeyCookie
 from pwdlib import PasswordHash
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +32,7 @@ from schemas.usuarios import Token
 
 password_hash = PasswordHash.recommended()
 
-TOKEN_URL = "/api/usuarios/token"
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=TOKEN_URL)
+cookie_scheme = APIKeyCookie(name=settings.AUTH_COOKIE_NAME)
 
 
 def hash_password(password: str) -> str:
@@ -93,8 +94,31 @@ def verify_access_token(token: str) -> str:
         return payload["sub"]
 
 
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        value=token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+        secure=settings.AUTH_COOKIE_SECURE,
+        httponly=True,   # JavaScript no puede leerla
+        samesite="lax",  # no se envía en POST/PUT/PATCH/DELETE cross-site (CSRF)
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    # Mismos atributos que al crearla, para que el navegador la reconozca.
+    response.delete_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        path="/",
+        secure=settings.AUTH_COOKIE_SECURE,
+        httponly=True,
+        samesite="lax",
+    )
+
+
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
+    token: Annotated[str, Depends(cookie_scheme)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> models.User:
     try:
@@ -107,7 +131,6 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="El usuario ingresado no existe.",
-            headers={"WWW-Authenticate": "Bearer"},
         )
     return user
 
@@ -115,14 +138,32 @@ async def get_current_user(
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
+async def get_optional_user(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> models.User | None:
+    """Solo para páginas públicas (login, registro) que cambian si ya hay sesión.
+
+    Nunca lanza: sin cookie o con token inválido devuelve None.
+    """
+    token = request.cookies.get(settings.AUTH_COOKIE_NAME)
+    if not token:
+        return None
+    try:
+        return await get_current_user(token, db)
+    except HTTPException:
+        return None
+
+
+OptionalUser = Annotated[models.User | None, Depends(get_optional_user)]
+
+
 _credentials_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="No se pudieron validar las credenciales.",
-    headers={"WWW-Authenticate": "Bearer"},
 )
 
 _token_expired = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Token invalido o expirado.",
-    headers={"WWW-Authenticate": "Bearer"},
 )

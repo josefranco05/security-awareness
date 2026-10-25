@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,13 +11,15 @@ from sqlalchemy import select, func
 
 import models
 from core.config import settings
-from schemas.usuarios import Token, UserCreate, UserPublic, UserPrivate, UserUpdate
+from schemas.usuarios import UserCreate, UserPublic, UserPrivate, UserUpdate
 from database.async_database import get_db
 from core.auth import (
     autenticar_usuario,
     CurrentUser,
-    create_access_token, 
+    create_access_token,
     hash_password,
+    set_auth_cookie,
+    clear_auth_cookie,
     _credentials_exception)
 from utils.validaciones import validar_usuario, validar_email_usuario
 
@@ -36,16 +38,27 @@ async def get_usuario_actual(current_user: CurrentUser):
 
 @router.post(
         "/token",
-        response_model=Token
+        status_code=status.HTTP_204_NO_CONTENT
 )
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     usuario = await autenticar_usuario(db, form_data.username, form_data.password)
     if usuario is None:
         raise _credentials_exception
-    return create_access_token(subject=usuario.uid)
+    token = create_access_token(subject=usuario.uid)
+    set_auth_cookie(response, token.access_token)
+
+
+# Sin CurrentUser a propósito: con el token expirado también debe poder borrarse la cookie.
+@router.post(
+        "/logout",
+        status_code=status.HTTP_204_NO_CONTENT
+)
+async def logout(response: Response):
+    clear_auth_cookie(response)
 
 
 # CRUD
