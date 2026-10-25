@@ -21,47 +21,70 @@
         <!-- ===================== Navbar ===================== -->
         {# Sobrescribe este bloque vacío para ocultar el navbar (p. ej. login/registro). #}
         {% block navbar %}
-        <header class="navbar">
-            <div class="navbar-inner">
+        {# Sidebar: rail de iconos; los textos aparecen al pasar el mouse o con foco de teclado. #}
+        <aside class="sidebar" id="navMenu">
+            {# Solo el escudo: el nombre va en el topbar para mostrarse siempre. #}
+            <a class="brand" href="{{ url_for('home') }}" data-auth-href="{{ url_for('dashboard') }}"
+                aria-label="Inicio">
+                <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor" />
+                    <path d="M9 12l2 2 4-4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+            </a>
 
-                <a class="brand" href="{{ url_for('home') }}" data-auth-href="{{ url_for('dashboard') }}">
-                    <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-                        aria-hidden="true">
-                        <path d="M12 2l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V5l7-3z" fill="currentColor" />
-                        <path d="M9 12l2 2 4-4" stroke="#0a1526" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" />
-                    </svg>
-                    <span class="brand-name">{% block brand_name %}Security Awareness{% endblock %}</span>
-                    <span class="brand-tag">PYMEs</span>
-                </a>
+            <nav aria-label="Navegación principal">
+                <ul class="nav-list">
+                    <li><a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+                            href="{{ url_for('dashboard') }}">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
+                            <span class="nav-label">Dashboard</span></a></li>
+                    <li><a class="nav-link {% if active_page == 'deteccion' %}active{% endif %}"
+                            href="{{ url_for('deteccion') }}">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3M8.5 11l1.8 1.8 3.2-3.3" /></svg>
+                            <span class="nav-label">Detección</span></a></li>
+                    <li><a class="nav-link {% if active_page == 'simulacion' %}active{% endif %}"
+                            href="{{ url_for('simulacion') }}">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                            <span class="nav-label">Simulación</span></a></li>
+                    <li><a class="nav-link {% if active_page == 'campanas' %}active{% endif %}"
+                            href="{{ url_for('campañas') }}">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22V4M4 4h13l-2.5 4.5L17 13H4" /></svg>
+                            <span class="nav-label">Campañas</span></a></li>
+                    <li><a class="nav-link {% if active_page == 'empleados' %}active{% endif %}"
+                            href="{{ url_for('empleados') }}">
+                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4" /><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M16 3.13a4 4 0 0 1 0 7.75M22 21v-2a4 4 0 0 0-3-3.87" /></svg>
+                            <span class="nav-label">Empleados</span></a></li>
+                </ul>
+            </nav>
+        </aside>
 
-                <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false">
-                    <span></span><span></span><span></span>
+        {# Topbar: solo cuenta y cierre de sesión. #}
+        <header class="topbar">
+            <button class="icon-btn nav-toggle" id="navToggle" type="button" aria-label="Abrir menú"
+                aria-controls="navMenu" aria-expanded="false">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+
+            <a class="brand" href="{{ url_for('home') }}" data-auth-href="{{ url_for('dashboard') }}">
+                <span class="brand-name">{% block brand_name %}Security Awareness{% endblock %}</span>
+                <span class="brand-tag">PYMEs</span>
+            </a>
+
+            <div class="topbar-end">
+                {% block navbar_end %}
+                {# Usuario actual (se rellena con Auth.getCurrentUser) #}
+                <span class="nav-user text-muted" id="navUser" hidden></span>
+                {# TODO: enlazar a la página de configuración de la cuenta cuando exista. #}
+                <button type="button" class="icon-btn" id="accountButton" aria-label="Mi cuenta"
+                    title="Configuración de la cuenta (próximamente)">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="10" r="3" /><path d="M6.2 18.4a7 7 0 0 1 11.6 0" /></svg>
                 </button>
-
-                <nav class="nav" id="navMenu" aria-label="Navegación principal">
-                    <ul class="nav-list">
-                        <li><a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}"
-                                href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                        <li><a class="nav-link {% if active_page == 'deteccion' %}active{% endif %}"
-                                href="{{ url_for('deteccion') }}">Detección</a></li>
-                        <li><a class="nav-link {% if active_page == 'simulacion' %}active{% endif %}"
-                                href="{{ url_for('simulacion') }}">Simulación</a></li>
-                        <li><a class="nav-link {% if active_page == 'campanas' %}active{% endif %}"
-                                href="{{ url_for('campañas') }}">Campañas</a></li>
-                        <li><a class="nav-link {% if active_page == 'empleados' %}active{% endif %}"
-                                href="{{ url_for('empleados') }}">Empleados</a></li>
-                    </ul>
-                </nav>
-
-                <div class="navbar-end">
-                    {% block navbar_end %}
-                    {# Zona de sesión: usuario actual (se rellena con Auth.getCurrentUser) + logout #}
-                    <span class="nav-user text-muted" id="navUser" hidden></span>
-                    <button type="button" class="btn btn-secondary btn-sm" id="logoutButton">Cerrar sesión</button>
-                    {% endblock %}
-                </div>
-
+                <button type="button" class="btn btn-secondary btn-sm" id="logoutButton">
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+                    Cerrar sesión
+                </button>
+                {% endblock %}
             </div>
         </header>
         {% endblock %}
@@ -101,14 +124,26 @@
     </div>
 
     <script>
-        // Toggle de menú en móvil
+        // Móvil: la hamburguesa abre el sidebar como cajón; clic fuera o Escape lo cierran.
         (function () {
             var toggle = document.getElementById('navToggle');
             var menu = document.getElementById('navMenu');
             if (!toggle || !menu) return;
-            toggle.addEventListener('click', function () {
-                var open = menu.classList.toggle('open');
+
+            function setOpen(open) {
+                menu.classList.toggle('open', open);
                 toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setOpen(!menu.classList.contains('open'));
+            });
+            document.addEventListener('click', function (e) {
+                if (!menu.contains(e.target)) setOpen(false);
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') setOpen(false);
             });
         })();
 
