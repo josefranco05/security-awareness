@@ -9,10 +9,12 @@ Ejecutar:
 from __future__ import annotations
 
 import contextvars
+import hashlib
+from functools import lru_cache
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Literal
 from datetime import datetime, UTC
 from contextlib import asynccontextmanager
 
@@ -25,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -78,10 +81,29 @@ app = FastAPI(
 # Sesión en cookie (para los mensajes flash)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+# Comprime HTML, JSON, CSS y JS. Las respuestas pequeñas no compensan.
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Archivos estáticos (CSS, imágenes, JS propios)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+STATIC_DIR = BASE_DIR / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+
+@lru_cache(maxsize=128)
+def _hash_estatico(ruta: str, mtime_ns: int) -> str:
+    # mtime_ns forma parte de la clave: si el archivo cambia, se recalcula.
+    return hashlib.sha256((STATIC_DIR / ruta).read_bytes()).hexdigest()[:12]
+
+
+def static_url(ruta: str) -> str:
+    """URL versionada por contenido: cambia sola cuando cambia el archivo."""
+    mtime_ns = (STATIC_DIR / ruta).stat().st_mtime_ns
+    return f"/static/{ruta}?v={_hash_estatico(ruta, mtime_ns)}"
+
+
+templates.env.globals["static_url"] = static_url
 
 # Rutas protegidas: requieren un JWT válido en la cookie HttpOnly de sesión
 auth_required = [Depends(get_current_user)]
@@ -133,9 +155,14 @@ async def verificar_origen(request: Request, call_next):
 async def cabeceras_cache(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/static/"):
-        # Se guardan pero se revalidan siempre (304 por ETag si no cambiaron):
-        # tras un deploy nadie se queda con un auth.js viejo.
-        response.headers.setdefault("Cache-Control", "no-cache")
+        # Con ?v=<hash> (static_url) la URL cambia con el contenido: se cachea
+        # un año sin revalidar. Sin versión se revalida siempre (304 por ETag),
+        # así tras un deploy nadie se queda con un auth.js viejo.
+        versionado = "v" in request.query_params and response.status_code == 200
+        response.headers.setdefault(
+            "Cache-Control",
+            "public, max-age=31536000, immutable" if versionado else "no-cache",
+        )
     else:
         # Páginas y API nunca se almacenan: tras el logout, "Atrás" vuelve a
         # pedir la página al servidor y este redirige a /login.
@@ -154,6 +181,20 @@ def get_flashed_messages(with_categories: bool = False):
 
 
 templates.env.globals["get_flashed_messages"] = get_flashed_messages
+
+
+# Tema claro/oscuro: vive en una cookie del navegador y el servidor lo pinta en
+# <html data-theme>, así la página llega ya con el tema correcto (sin parpadeo).
+TEMA_COOKIE = "tema"
+Tema = Literal["light", "dark"]
+
+
+def tema_actual() -> str:
+    tema = _request_ctx.get().cookies.get(TEMA_COOKIE)
+    return tema if tema in ("light", "dark") else "light"
+
+
+templates.env.globals["tema_actual"] = tema_actual
 
 
 # RUTAS
@@ -272,6 +313,51 @@ async def simulacion(request: Request, current_user: CurrentUser, db: Annotated[
     )
     empleados = results.all()
     return templates.TemplateResponse(request, "simulacion.html", {"employees": empleados})
+
+
+@app.get("/cuenta", name="cuenta", include_in_schema=False)
+async def cuenta(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    # Conteos para que el modal de borrado diga exactamente qué se pierde.
+    campañas = await db.scalar(
+        select(func.count())
+        .select_from(models.Campaña)
+        .where(models.Campaña.owner == current_user.uid)
+    )
+    empleados = await db.scalar(
+        select(func.count())
+        .select_from(models.Empleados)
+        .where(models.Empleados.owner == current_user.uid)
+    )
+    simulaciones = await db.scalar(
+        select(func.count())
+        .select_from(models.Simulaciones)
+        .join(models.Simulaciones.campana)
+        .where(models.Campaña.owner == current_user.uid)
+    )
+    return templates.TemplateResponse(
+        request,
+        "cuenta.html",
+        {
+            "usuario": current_user,
+            "conteos": {"campanas": campañas, "empleados": empleados, "simulaciones": simulaciones},
+        },
+    )
+
+
+@app.post("/cuenta/tema", name="cambiar_tema", include_in_schema=False)
+async def cambiar_tema(request: Request, current_user: CurrentUser, tema: Annotated[Tema, Form()]):
+    # Un valor fuera de light/dark lo rechaza la validación (422).
+    response = RedirectResponse(str(request.url_for("cuenta")), status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        TEMA_COOKIE,
+        tema,
+        max_age=60 * 60 * 24 * 365,
+        httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+    )
+    return response
 
 
 @app.get("/recuperar-contrasena", name="forgot_password", include_in_schema=False)

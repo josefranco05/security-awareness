@@ -192,7 +192,7 @@
                     <div class="rte-group">
                         <label class="rte-color" title="Color del texto">
                             <span class="rte-color-icon">A</span>
-                            <input type="color" data-cmd="foreColor" value="#e8eef7" aria-label="Color del texto">
+                            <input type="color" data-cmd="foreColor" value="#1e2b3c" aria-label="Color del texto">
                         </label>
                         <label class="rte-color" title="Color de resaltado">
                             <span class="rte-color-icon rte-color-icon-hl">A</span>
@@ -325,7 +325,7 @@
 
 
 {% block scripts %}
-<script src="{{ url_for('static', path='js/rich-text-editor.js') }}"></script>
+<script src="{{ static_url('js/rich-text-editor.js') }}"></script>
 <script>
     (function () {
         "use strict";

@@ -52,6 +52,15 @@ stages:
       workingDirectory: $(projectRoot)
       displayName: "Validate main.py imports"
 
+    # El repo guarda el CSS legible; el paquete se despliega minificado.
+    # rcssmin solo se instala en el agente de build, no en requirements.txt.
+    - script: |
+        source antenv/bin/activate
+        pip install rcssmin
+        python -c "import pathlib, rcssmin; p = pathlib.Path('static/css/style.css'); antes = p.stat().st_size; p.write_text(rcssmin.cssmin(p.read_text(encoding='utf-8')), encoding='utf-8'); print(f'style.css: {antes} -> {p.stat().st_size} bytes')"
+      workingDirectory: $(projectRoot)
+      displayName: "Minify CSS"
+
     - script: |
         chmod +x startup.sh
         rm -rf antenv
