@@ -9,4 +9,4 @@ if [ "${CELERY_TASK_ALWAYS_EAGER:-true}" != "true" ]; then
   celery -A worker.celery_app.celery_app beat --loglevel=info &
 fi
 
-exec gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}
+exec gunicorn -w 2 -k uvicorn_worker.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}

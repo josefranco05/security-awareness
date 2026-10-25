@@ -1,5 +1,6 @@
 fastapi[standard]
 uvicorn[standard]
+uvicorn-worker
 gunicorn
 python-dotenv
 jinja2
