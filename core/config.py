@@ -26,11 +26,11 @@ class Settings(BaseSettings):
 
     # --- Base de datos -------------------------------------------------
     # Se pueden sobreescribir para apuntar a una base de pruebas.
-    DATABASE_URL: str = "sqlite+aiosqlite:///./database.db"
-    WORKER_DATABASE_URL: str = "sqlite:///./database.db"
+    DATABASE_URL: str
+    WORKER_DATABASE_URL: str
 
     # --- Celery --------------------------------------------------------
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str
     # Sin Redis disponible el sistema funciona igual: la tarea se ejecuta
     # dentro del proceso web. Es el modo de desarrollo/demo.
     CELERY_TASK_ALWAYS_EAGER: bool = True
@@ -38,13 +38,13 @@ class Settings(BaseSettings):
     # --- Correo --------------------------------------------------------
     # "log"  -> no envía nada, solo registra (sirve sin dominio verificado)
     # "acs"  -> Azure Communication Services Email
-    EMAIL_BACKEND: Literal["log", "acs"] = "log"
+    EMAIL_BACKEND: Literal["log", "acs"]
     ACS_CONNECTION_STRING: str = ""
     ACS_SENDER: str = ""
     ACS_REPLY_TO: str = ""
     # Secreto que Event Grid envía en la cabecera X-Webhook-Secret (delivery
     # property de la suscripción). Vacío = el webhook rechaza todo.
-    ACS_WEBHOOK_SECRET: SecretStr = SecretStr("")
+    ACS_WEBHOOK_SECRET: SecretStr
 
     # --- Reintentos ----------------------------------------------------
     EMAIL_MAX_INTENTOS: int = 3
@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # --- Protección CSRF -----------------------------------------------
     # Orígenes desde los que se aceptan POST/PUT/PATCH/DELETE. En el .env va
     # como JSON, p. ej.: ALLOWED_ORIGINS='["https://app.sentinel.world"]'
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:8000", "http://127.0.0.1:8000"]
+    ALLOWED_ORIGINS: list[str]
 
     @field_validator("EMAIL_BACKEND", mode="before")
     @classmethod

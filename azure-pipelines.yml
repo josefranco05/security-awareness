@@ -41,6 +41,15 @@ stages:
         python -c "import main; print('main.py imports OK')"
       workingDirectory: $(projectRoot)
       displayName: "Validate main.py imports"
+      # Valores ficticios solo para el import; los reales están en las App Settings.
+      env:
+        SECRET_KEY_AUTH: build-only-dummy
+        DATABASE_URL: sqlite+aiosqlite:///./build.db
+        WORKER_DATABASE_URL: sqlite:///./build.db
+        CELERY_BROKER_URL: memory://
+        EMAIL_BACKEND: log
+        ACS_WEBHOOK_SECRET: build-only-dummy
+        ALLOWED_ORIGINS: '["http://localhost"]'
 
     - script: |
         chmod +x startup.sh
