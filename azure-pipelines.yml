@@ -38,9 +38,9 @@ stages:
 
     - script: |
         source antenv/bin/activate
-        python -c "import app; print('app.py imports OK')"
+        python -c "import main; print('main.py imports OK')"
       workingDirectory: $(projectRoot)
-      displayName: "Validate app.py imports"
+      displayName: "Validate main.py imports"
 
     - script: |
         chmod +x startup.sh

@@ -4,12 +4,6 @@
 
 {% block title %}Campañas · Security Awareness{% endblock %}
 
-{# Estilos propios de esta pantalla. Van en un archivo aparte para que el
-navegador no los sirva desde una copia antigua en caché. #}
-{% block head %}
-<link rel="stylesheet" type="text/css" href="{{ url_for('static', path='css/campaigns.css') }}">
-{% endblock %}
-
 {% set employees = employees | default([], true) %}
 
 {% block content %}
@@ -21,17 +15,10 @@ navegador no los sirva desde una copia antigua en caché. #}
     </div>
 
     {#
-    El formulario apunta a la ruta existente `enviar_campana` (POST /enviar-campana).
-    Campos que se envían, listos para que la ruta los consuma:
-
-    nombre -> nombre de la campaña (ya existe en app.py)
-    remitente -> remitente del correo simulado (ya existe en app.py)
-    asunto -> asunto del correo simulado (ya existe en app.py)
-    cuerpo -> HTML del correo (ya existe en app.py)
-    destinatarios -> repetido, un correo por empleado seleccionado.
-    FastAPI lo recibe como: destinatarios: list[str] = Form([])
+    El envío se hace como JSON a POST /api/campañas.
+    Los destinatarios se envían como IDs numéricos de empleados.
     #}
-    <form id="campaignForm" method="post" action="{{ url_for('enviar_campana') }}" novalidate>
+    <form id="formCampaña" novalidate>
 
         {# El editor escribe aquí el HTML final del correo. #}
         <input type="hidden" name="cuerpo" id="campaignBody">
@@ -98,8 +85,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     <label class="ee-item"
                         data-search="{{ (employee.nombre ~ ' ' ~ employee.email ~ ' ' ~ employee.empresa) | lower }}">
 
-                        <input type="checkbox" class="ee-check" name="destinatarios" value="{{ employee.email }}"
-                            data-ee-id="{{ employee.eeid }}" data-ee-name="{{ employee.nombre }}">
+                        <input type="checkbox" class="ee-check" name="destinatarios" value="{{ employee.eeid }}">
 
                         <span class="ee-avatar" aria-hidden="true">{{ (iniciales[0][0] if iniciales else '?') | upper
                             }}{{ (iniciales[1][0] if iniciales | length > 1 else '') | upper }}</span>
@@ -125,7 +111,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     {% else %}
                     <p class="ee-empty">
                         No hay empleados registrados.
-                        <a href="{{ url_for('empleado_nuevo') }}">Agrega tu primer empleado</a>.
+                        <a href="{{ url_for('empleados') }}">Agrega tu primer empleado</a>.
                     </p>
                     {% endfor %}
                 </div>
@@ -153,8 +139,8 @@ navegador no los sirva desde una copia antigua en caché. #}
                 <div class="mail-meta">
                     <div class="mail-row">
                         <label class="mail-label" for="editFrom">De:</label>
-                        <input type="text" id="editFrom" name="remitente"
-                            placeholder="Seguridad &lt;seguridad@empresa.com.co&gt;" autocomplete="off">
+                        <input type="text" id="editFrom" name="remitente" placeholder="seguridad@empresa.com.co"
+                            autocomplete="off">
                     </div>
                     <div class="mail-row">
                         <label class="mail-label" for="editSubject">Asunto:</label>
@@ -302,6 +288,39 @@ navegador no los sirva desde una copia antigua en caché. #}
         </div>
     </form>
 </div>
+
+<div class="modal" id="campaignSuccessModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="campaignSuccessTitle">
+        <div class="modal-header">
+            <h2 class="card-title text-success" id="campaignSuccessTitle">Campaña creada</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-success" role="status">
+            <p class="alert-text" id="campaignSuccessMessage"></p>
+        </div>
+        <p class="card-subtitle">Serás redirigido a campañas en unos segundos.</p>
+        <div class="modal-actions">
+            <a class="btn btn-primary" id="campaignSuccessLink" href="{{ url_for('campañas') }}">Ver campañas</a>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="campaignErrorModal" hidden>
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card modal-card-sm" role="dialog" aria-modal="true" aria-labelledby="campaignErrorTitle">
+        <div class="modal-header">
+            <h2 class="card-title text-danger" id="campaignErrorTitle">No se pudo crear la campaña</h2>
+            <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="alert alert-danger" role="alert">
+            <p class="alert-text" id="campaignErrorMessage"></p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-modal-close>Volver al formulario</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 
@@ -311,14 +330,14 @@ navegador no los sirva desde una copia antigua en caché. #}
     (function () {
         "use strict";
 
-        var form = document.getElementById("campaignForm");
+        var form = document.getElementById("formCampaña");
         if (!form) return;
 
         /* ---------------------------------------------------------- plantillas */
         /* Contenido de ejemplo, genérico y seguro, para el entrenamiento. */
         var TEMPLATES = [
             {
-                from: "Seguridad <seguridad@bancoseguro.com.co>",
+                from: "seguridad@bancoseguro.com.co",
                 subject: "Acción requerida: verifica tu cuenta",
                 body: "<p>Hola,</p>" +
                     "<p>Hemos detectado actividad inusual en tu cuenta. Para evitar el bloqueo temporal, " +
@@ -327,7 +346,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     "<p>Atentamente,<br>Equipo de Seguridad</p>"
             },
             {
-                from: "Facturación <facturas@proveedores.co>",
+                from: "facturas@proveedores.co",
                 subject: "Factura pendiente de pago",
                 body: "<p>Estimado cliente,</p>" +
                     "<p>Adjuntamos una factura pendiente de pago. Si no se regulariza en 48 horas, " +
@@ -336,7 +355,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     "<p>Departamento de Facturación</p>"
             },
             {
-                from: "Correo Corporativo <noreply@tuempresa.co>",
+                from: "noreply@tuempresa.co",
                 subject: "Tu buzón de correo está lleno",
                 body: "<p>Hola,</p>" +
                     "<p>Tu buzón alcanzó el 98% de su capacidad. Libera espacio o actualiza tu plan " +
@@ -345,7 +364,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     "<p>Soporte de Correo Corporativo</p>"
             },
             {
-                from: "Premios y Sorteos <premios@sorteos.co>",
+                from: "premios@sorteos.co",
                 subject: "¡Felicidades! Has sido seleccionado",
                 body: "<p>¡Felicidades!</p>" +
                     "<p>Has sido seleccionado para recibir un premio especial. Reclama tu beneficio " +
@@ -354,7 +373,7 @@ navegador no los sirva desde una copia antigua en caché. #}
                     "<p>Equipo de Premios</p>"
             },
             {
-                from: "Soporte TI <soporte.ti@tuempresa.co>",
+                from: "soporte.ti@tuempresa.co",
                 subject: "Actualización de contraseña requerida",
                 body: "<p>Hola,</p>" +
                     "<p>Por políticas de seguridad, tu contraseña expira hoy. Actualízala para " +
@@ -781,13 +800,19 @@ navegador no los sirva desde una copia antigua en caché. #}
 
         var submitting = false;
 
+        function showCampaignError(error) {
+            document.getElementById("campaignErrorMessage").textContent = getErrorMessage(error);
+            showModal("campaignErrorModal");
+            submitting = false;
+            btnCreate.disabled = false;
+            btnCreate.textContent = "Crear campaña";
+        }
+
         /*
-          El envío lo hace el navegador contra la ruta FastAPI
-          (action = url_for('enviar_campana')). Este listener SOLO veta: si algo no
-          valida llama a preventDefault(); si todo está correcto no interviene y el
-          POST sigue su curso normal. No se reconstruye el submit desde JS.
+                    La validación del wizard se conserva y, en el último paso, el formulario
+                    envía JSON a la ruta API de creación de campañas.
         */
-        form.addEventListener("submit", function (event) {
+        form.addEventListener("submit", async function (event) {
             if (submitting) {
                 event.preventDefault();
                 return;
@@ -817,10 +842,51 @@ navegador no los sirva desde una copia antigua en caché. #}
                 return;
             }
 
-            // Válido: solo feedback visual; el envío nativo continúa.
+            event.preventDefault();
             submitting = true;
             btnCreate.disabled = true;
             btnCreate.textContent = "Creando campaña…";
+
+            var payload = {
+                nombre: nameInput.value.trim(),
+                remitente: fromInput.value.trim(),
+                asunto: subjectInput.value.trim(),
+                cuerpo: bodyField.value,
+                destinatarios: boxes().filter(function (box) {
+                    return box.checked;
+                }).map(function (box) {
+                    return Number(box.value);
+                })
+            };
+
+            try {
+                var response = await Auth.fetch("/api/campañas", {
+                    method: "POST",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                var result = await response.json().catch(function () {
+                    return {};
+                });
+
+                if (!response.ok) {
+                    showCampaignError(result);
+                    return;
+                }
+
+                document.getElementById("campaignSuccessMessage").textContent =
+                    "La campaña se creó correctamente" + (result.camid ? " (ID " + result.camid + ")." : ".");
+                showModal("campaignSuccessModal");
+                btnCreate.textContent = "Campaña creada";
+                window.setTimeout(function () {
+                    window.location.assign(document.getElementById("campaignSuccessLink").href);
+                }, 2500);
+            } catch (error) {
+                showCampaignError({ detail: error.message });
+            }
         });
 
         /* ----------------------------------------------------------- arranque */
