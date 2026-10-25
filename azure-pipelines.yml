@@ -40,6 +40,7 @@ stages:
         source antenv/bin/activate
         # Valores ficticios solo para el import; los reales están en las App Settings.
         # Van en línea y no en env: para que ninguna variable del pipeline los pise.
+        SECRET_KEY=build-only-dummy \
         SECRET_KEY_AUTH=build-only-dummy \
         ACS_WEBHOOK_SECRET=build-only-dummy \
         DATABASE_URL=sqlite+aiosqlite:///./build.db \
