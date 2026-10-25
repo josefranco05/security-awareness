@@ -1,11 +1,12 @@
 fastapi[standard]
 uvicorn[standard]
+uvicorn-worker
 gunicorn
 python-dotenv
 jinja2
 starlette
 itsdangerous
-sqlalchemy
+sqlalchemy[asyncio]
 aiosqlite
 celery[redis]>=5.6,<6
 redis>=5,<7

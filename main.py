@@ -9,6 +9,8 @@ Ejecutar:
 from __future__ import annotations
 
 import contextvars
+import hashlib
+from functools import lru_cache
 from pathlib import Path
 import os
 from dotenv import load_dotenv
@@ -25,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -78,10 +81,29 @@ app = FastAPI(
 # Sesión en cookie (para los mensajes flash)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+# Comprime HTML, JSON, CSS y JS. Las respuestas pequeñas no compensan.
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Archivos estáticos (CSS, imágenes, JS propios)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+STATIC_DIR = BASE_DIR / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 templates = Jinja2Templates(directory="templates")
+
+
+@lru_cache(maxsize=128)
+def _hash_estatico(ruta: str, mtime_ns: int) -> str:
+    # mtime_ns forma parte de la clave: si el archivo cambia, se recalcula.
+    return hashlib.sha256((STATIC_DIR / ruta).read_bytes()).hexdigest()[:12]
+
+
+def static_url(ruta: str) -> str:
+    """URL versionada por contenido: cambia sola cuando cambia el archivo."""
+    mtime_ns = (STATIC_DIR / ruta).stat().st_mtime_ns
+    return f"/static/{ruta}?v={_hash_estatico(ruta, mtime_ns)}"
+
+
+templates.env.globals["static_url"] = static_url
 
 # Rutas protegidas: requieren un JWT válido en la cookie HttpOnly de sesión
 auth_required = [Depends(get_current_user)]
@@ -133,9 +155,14 @@ async def verificar_origen(request: Request, call_next):
 async def cabeceras_cache(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/static/"):
-        # Se guardan pero se revalidan siempre (304 por ETag si no cambiaron):
-        # tras un deploy nadie se queda con un auth.js viejo.
-        response.headers.setdefault("Cache-Control", "no-cache")
+        # Con ?v=<hash> (static_url) la URL cambia con el contenido: se cachea
+        # un año sin revalidar. Sin versión se revalida siempre (304 por ETag),
+        # así tras un deploy nadie se queda con un auth.js viejo.
+        versionado = "v" in request.query_params and response.status_code == 200
+        response.headers.setdefault(
+            "Cache-Control",
+            "public, max-age=31536000, immutable" if versionado else "no-cache",
+        )
     else:
         # Páginas y API nunca se almacenan: tras el logout, "Atrás" vuelve a
         # pedir la página al servidor y este redirige a /login.
