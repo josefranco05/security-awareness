@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from core.auth import CurrentUser
 from database.async_database import get_db
 from schemas.empleados import EmpleadoResponse, EmpleadoCreate, EmpleadoUpdate
 from utils.validaciones import validar_email_empleado, validar_empleado_por_id
@@ -58,11 +59,13 @@ async def get_empleado(
     )
 async def agregar_empleado(
     empleado: EmpleadoCreate,
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    await validar_email_empleado(empleado.email, db)
+    await validar_email_empleado(empleado.email, current_user.uid, db)
 
     nuevo_empleado = models.Empleados(
+        owner=current_user.uid,
         nombre=empleado.nombre,
         email=empleado.email,
         empresa=empleado.empresa,
@@ -89,7 +92,7 @@ async def remplazar_empleado(
 ):
     empleado_a_cambiar = await validar_empleado_por_id(eeid, db)
 
-    await validar_email_empleado(empleado.email, db, eeid)
+    await validar_email_empleado(empleado.email, empleado_a_cambiar.owner, db, eeid)
 
     empleado_a_cambiar.nombre = empleado.nombre
     empleado_a_cambiar.email = empleado.email
@@ -123,7 +126,7 @@ async def editar_empleado(
         )    
     
     if cambios.get("email") is not None:
-        await validar_email_empleado(cambios["email"], db, eeid)
+        await validar_email_empleado(cambios["email"], empleado_a_cambiar.owner, db, eeid)
 
     for campo, valor in cambios.items():
         setattr(empleado_a_cambiar, campo, valor)

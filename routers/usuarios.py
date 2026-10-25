@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 from typing import Annotated
-from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
 
 import models
-from core.config import settings
+from core.permisos import UsuarioPropio
 from schemas.usuarios import UserCreate, UserPublic, UserPrivate, UserUpdate
 from database.async_database import get_db
 from core.auth import (
@@ -63,38 +61,10 @@ async def logout(response: Response):
 
 # CRUD
 @router.get(
-        "",
-        response_model=list[UserPublic]
-)
-async def get_usuarios(
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    result = await db.scalars(
-        select(models.User)
-    )
-    usuarios = result.all()
-    return usuarios
-
-
-@router.get(
         "/{uid}",
         response_model=UserPublic
 )
-async def get_usuario(
-    uid: int,
-    current_user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    usuario = await db.scalar(
-        select(models.User)
-        .where(models.User.uid == uid)
-    )
-    if usuario is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró un usuario con id {uid}"
-        )
+async def get_usuario(usuario: UsuarioPropio):
     return usuario
 
 
@@ -130,13 +100,11 @@ async def crear_usuario(
     response_model=UserPrivate
 )
 async def actualizar_usuario(
-    uid: int,
-    usuario: UserUpdate,
-    current_user: CurrentUser,
+    cambios_usuario: UserUpdate,
+    usuario: UsuarioPropio,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    _verificar_propietario(uid, current_user)
-    cambios = usuario.model_dump(exclude_unset=True)
+    cambios = cambios_usuario.model_dump(exclude_unset=True)
 
     if not cambios:
         raise HTTPException(
@@ -144,18 +112,21 @@ async def actualizar_usuario(
             detail="No se detecto ningun cambio en los datos del usuario."
         )
 
+    if cambios.get("username") is not None:
+        await validar_usuario(cambios["username"], db, usuario.uid)
+
     if cambios.get("email") is not None:
-        await validar_email_usuario(cambios["email"], db, uid)
+        await validar_email_usuario(cambios["email"], db, usuario.uid)
 
     for campo, valor in cambios.items():
         if campo == "email":
-            setattr(current_user, campo, valor.lower())
+            setattr(usuario, campo, valor.lower())
         else:
-            setattr(current_user, campo, valor)
+            setattr(usuario, campo, valor)
 
     await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    await db.refresh(usuario)
+    return usuario
 
 
 @router.delete(
@@ -163,19 +134,11 @@ async def actualizar_usuario(
      status_code=status.HTTP_204_NO_CONTENT
 )
 async def eliminar_usuario(
-    uid: int,
-    current_user: CurrentUser,
+    usuario: UsuarioPropio,
+    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    _verificar_propietario(uid, current_user)
-
-    await db.delete(current_user)
+    # Borra en cascada sus campañas, empleados y simulaciones (ver models.User).
+    await db.delete(usuario)
     await db.commit()
-
-# HELPER PARA PERMISOS DE MODIFICAR USUARIOS
-def _verificar_propietario(uid: int, current_user: models.User) -> None:
-    if current_user.uid != uid:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes permiso para modificar este usuario."
-        )
+    clear_auth_cookie(response)

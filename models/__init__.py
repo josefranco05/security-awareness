@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
-from sqlalchemy import DateTime, String, Integer, ForeignKey, Text, Boolean
+from sqlalchemy import DateTime, String, Integer, ForeignKey, Text, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.async_database import Base
@@ -18,7 +18,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
 
-    campanas: Mapped[list[Campaña]] = relationship("Campaña", back_populates="user")
+    # Al borrar el usuario se borran sus datos (owner es NOT NULL).
+    campanas: Mapped[list[Campaña]] = relationship("Campaña", back_populates="user", cascade="all, delete-orphan")
+    empleados: Mapped[list[Empleados]] = relationship("Empleados", back_populates="user", cascade="all, delete-orphan")
 
     
 class Campaña(Base):
@@ -38,15 +40,19 @@ class Campaña(Base):
 
 class Empleados(Base):
     __tablename__ = "empleados"
+    # El email es único por dueño, no global: evita revelar empleados de otros usuarios.
+    __table_args__ = (UniqueConstraint("owner", "email"),)
 
     eeid: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
-    email: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(50), nullable=False)
     riesgo: Mapped[int] = mapped_column(Integer, nullable=False)
     empresa: Mapped[str] = mapped_column(String(100), nullable=False)
     cargo: Mapped[str] = mapped_column(String(50), nullable=True)
     estado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    user: Mapped[User] = relationship("User", back_populates="empleados")
     simulaciones: Mapped[list[Simulaciones]] = relationship(back_populates="empleados", cascade="all, delete-orphan")
 
 

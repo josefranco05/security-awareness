@@ -6,10 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from core.auth import CurrentUser
+from core.permisos import CampañaPropia
 from database.async_database import get_db
 from schemas.simulaciones import SimulacionResponse
 import models
-from utils.validaciones import validar_campaña
 
 
 router = APIRouter()
@@ -20,11 +21,15 @@ router = APIRouter()
     response_model=list[SimulacionResponse],
 )
 async def get_all_simulaciones(
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    # Las simulaciones no tienen owner propio: pertenecen al dueño de su campaña.
     result = await db.scalars(
         select(models.Simulaciones)
+        .join(models.Simulaciones.campana)
         .options(selectinload(models.Simulaciones.empleados))
+        .where(models.Campaña.owner == current_user.uid)
         .order_by(models.Simulaciones.fecha_envio.desc())
     )
     simulaciones = result.all()
@@ -36,13 +41,11 @@ async def get_all_simulaciones(
     response_model=list[SimulacionResponse],
 )
 async def get_simulaciones_por_campaña(
-    camid: int,
+    campaña: CampañaPropia,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    await validar_campaña(camid, db)
-
     result = await db.scalars(
-        select(models.Simulaciones).where(models.Simulaciones.campana_id == camid)
+        select(models.Simulaciones).where(models.Simulaciones.campana_id == campaña.camid)
     )
     simulaciones = result.all()
     return simulaciones

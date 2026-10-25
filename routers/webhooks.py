@@ -9,19 +9,35 @@ evento se ignora en lugar de fallar. El estado de envío no se ve afectado.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from core.config import settings
 from database.async_database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+
+async def verificar_event_grid(
+    x_webhook_secret: Annotated[str | None, Header()] = None,
+) -> None:
+    """Solo Event Grid conoce el secreto (delivery property de la suscripción)."""
+    esperado = settings.ACS_WEBHOOK_SECRET.get_secret_value()
+    # Sin secreto configurado se rechaza todo (fail closed). compare_digest
+    # tarda lo mismo acierte o no, para no filtrar el secreto por tiempos.
+    if not esperado or not x_webhook_secret or not hmac.compare_digest(
+        x_webhook_secret.encode(), esperado.encode()
+    ):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+
+router = APIRouter(dependencies=[Depends(verificar_event_grid)])
 
 EVENTO_VALIDACION = "Microsoft.EventGrid.SubscriptionValidationEvent"
 EVENTO_ENTREGA = "Microsoft.Communication.EmailDeliveryReportReceived"

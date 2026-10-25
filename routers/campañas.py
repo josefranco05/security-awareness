@@ -9,11 +9,11 @@ from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
 from core.auth import CurrentUser
+from core.permisos import CampañaPropia
 from database.async_database import get_db
 from schemas.campañas import CampañaCreate, CampañaResponse
 from worker.tasks import enviar_campaña
 import models
-from utils.validaciones import validar_campaña
 
 
 logger = logging.getLogger(__name__)
@@ -26,11 +26,13 @@ router =  APIRouter()
         response_model=list[CampañaResponse]
 )
 async def get_all_campañas(
+    current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     result = await db.scalars(
         select(models.Campaña)
         .options(selectinload(models.Campaña.simulaciones))
+        .where(models.Campaña.owner == current_user.uid)
         .order_by(models.Campaña.fecha.desc())
     )
     campañas = result.all()
@@ -41,16 +43,7 @@ async def get_all_campañas(
         "/{camid}",
         response_model=CampañaResponse
 )
-async def get_campaña_por_id(
-    camid: int,
-    db: Annotated[AsyncSession, Depends(get_db)]
-):
-    campaña = await db.scalar(
-        select(models.Campaña)
-        .options(selectinload(models.Campaña.simulaciones))
-        .where(models.Campaña.camid == camid)
-        .order_by(models.Campaña.fecha.desc())
-    )
+async def get_campaña_por_id(campaña: CampañaPropia):
     return campaña
 
 
@@ -126,11 +119,11 @@ async def crear_campaña(
     name="enviar_campaña_ahora",
 )
 async def enviar_campaña_ahora(
-    camid: int,
+    campaña: CampañaPropia,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Dispara manualmente el envío de las simulaciones pendientes."""
-    await validar_campaña(camid, db)
+    camid = campaña.camid
 
     pendientes = await db.scalar(
         select(func.count())
@@ -164,10 +157,8 @@ async def enviar_campaña_ahora(
     status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_campaña_por_id(
-    camid: int,
+    campaña: CampañaPropia,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    campaña_a_eliminar = await validar_campaña(camid, db)
-
-    await db.delete(campaña_a_eliminar)
+    await db.delete(campaña)
     await db.commit()

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     ACS_CONNECTION_STRING: str = ""
     ACS_SENDER: str = ""
     ACS_REPLY_TO: str = ""
+    # Secreto que Event Grid envía en la cabecera X-Webhook-Secret (delivery
+    # property de la suscripción). Vacío = el webhook rechaza todo.
+    ACS_WEBHOOK_SECRET: SecretStr = SecretStr("")
 
     # --- Reintentos ----------------------------------------------------
     EMAIL_MAX_INTENTOS: int = 3

@@ -32,6 +32,10 @@ from schemas.usuarios import Token
 
 password_hash = PasswordHash.recommended()
 
+# Hash con los mismos parámetros que los reales: se verifica contra él cuando el
+# username no existe, para que /token tarde lo mismo y no revele usuarios registrados.
+_HASH_FALSO = password_hash.hash("hash-falso-para-igualar-tiempos")
+
 cookie_scheme = APIKeyCookie(name=settings.AUTH_COOKIE_NAME)
 
 
@@ -50,7 +54,10 @@ async def autenticar_usuario(
     user = await db.scalar(
         select(models.User).where(func.lower(models.User.username) == username.lower())
      )
-    if not user or not verificar_password(password, user.password_hash):
+    if user is None:
+        verificar_password(password, _HASH_FALSO)
+        raise _credentials_exception
+    if not verificar_password(password, user.password_hash):
         raise _credentials_exception
     return user
 

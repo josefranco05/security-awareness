@@ -27,6 +27,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+# El http_logging_policy del SDK registra cada request/response a nivel INFO.
+# Aquí se silencia para la web y el worker; los errores (WARNING+) siguen saliendo.
+logging.getLogger("azure").setLevel(logging.WARNING)
+
 # Límites de red por llamada. Con los reintentos del SDK, un envío no puede
 # durar más de unos pocos minutos: muy por debajo de EMAIL_LOCK_TIMEOUT_MINUTOS,
 # así que `recuperar_colgadas` no libera una fila cuyo envío sigue en curso.
@@ -99,9 +103,9 @@ def _enviar_acs(sim: "models.Simulaciones", operation_id: str) -> str:
     if settings.ACS_REPLY_TO:
         mensaje["replyTo"] = [{"address": settings.ACS_REPLY_TO}]
 
-    # begin_send hace el POST y espera el 202 antes de devolver el poller: en
-    # ese punto ACS ya aceptó el correo. NO se llama a .result(), que espera el
-    # estado final y puede tardar minutos; la entrega llega por el webhook.
+    # begin_send hace el POST y espera el 202: en ese punto ACS ya aceptó el
+    # correo. polling=False evita que el SDK abra un hilo que consulta el estado
+    # de la operación en segundo plano; la entrega real llega por el webhook.
     try:
         cliente = EmailClient.from_connection_string(
             settings.ACS_CONNECTION_STRING,
@@ -110,6 +114,7 @@ def _enviar_acs(sim: "models.Simulaciones", operation_id: str) -> str:
         cliente.begin_send(
             mensaje,
             operation_id=operation_id,
+            polling=False,
             connection_timeout=ACS_CONNECTION_TIMEOUT,
             read_timeout=ACS_READ_TIMEOUT,
         )

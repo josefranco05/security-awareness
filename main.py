@@ -224,6 +224,7 @@ async def campañas(request: Request, current_user: CurrentUser, db: Annotated[A
             selectinload(models.Campaña.simulaciones)
             .selectinload(models.Simulaciones.empleados)
         )
+        .where(models.Campaña.owner == current_user.uid)
         .order_by(models.Campaña.fecha.desc())
     )
     campanas = result.all()
