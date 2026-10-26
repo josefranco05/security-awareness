@@ -11,6 +11,7 @@ engine = create_async_engine(
     connect_args={"timeout": 30, "check_same_thread": False},
 )
 
+
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,

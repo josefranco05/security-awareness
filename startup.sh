@@ -9,4 +9,5 @@ if [ "${CELERY_TASK_ALWAYS_EAGER:-true}" != "true" ]; then
   celery -A worker.celery_app.celery_app beat --loglevel=info &
 fi
 
-exec gunicorn -w 2 -k uvicorn_worker.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}
+# Sin -w, gunicorn toma el número de workers de WEB_CONCURRENCY (App Setting).
+exec gunicorn -k uvicorn_worker.UvicornWorker main:app --bind 0.0.0.0:${PORT:-8000}
