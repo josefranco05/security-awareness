@@ -79,12 +79,18 @@ async def acs_eventos(
 
         datos = evento.get("data") or {}
         proveedor_id = datos.get("messageId")
-        entrega = datos.get("deliveryStatus") or ""
+        entrega = datos.get("status") or ""
+
+        if entrega == "Expanded":
+            continue
 
         if not proveedor_id:
             continue
 
         nuevo_estado = MAPA_ENTREGA.get(entrega, "failed")
+        # Motivo del rechazo (rebote, supresión...) para que la fila diga por qué falló.
+        detalle = (datos.get("deliveryStatusDetails") or {}).get("statusMessage")
+        error = None if nuevo_estado == "sent" else (detalle or entrega or "Sin estado de entrega")
 
         await db.execute(
             update(models.Simulaciones)
@@ -92,11 +98,12 @@ async def acs_eventos(
                 models.Simulaciones.proveedor_id == proveedor_id,
                 models.Simulaciones.status.in_(ESTADOS_SOBREESCRIBIBLES),
             )
-            .values(status=nuevo_estado)
+            .values(status=nuevo_estado, error=error)
         )
 
         logger.info(
-            f"webhook ACS: proveedor_id={proveedor_id} -> {nuevo_estado} (deliveryStatus={entrega})",
+            "webhook ACS: proveedor_id=%s -> %s (status=%s)",
+            proveedor_id, nuevo_estado, entrega,
         )
 
     await db.commit()
