@@ -99,7 +99,7 @@ async def crear_campaña(
     except Exception as exc:
         await db.rollback()
         # El detalle (SQL, tablas, restricciones) va al log, nunca al cliente.
-        logger.exception("No se pudo crear la campaña del usuario %s", current_user.uid)
+        logger.exception("No se pudo crear la campaña del usuario %s. Error: %s", current_user.uid, exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al crear la campaña. Intenta nuevamente."
