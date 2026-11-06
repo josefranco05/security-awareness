@@ -52,6 +52,12 @@
     --sidebar-bg: linear-gradient(180deg, #fff 0%, #f1f7fd 55%, var(--mint-soft) 100%);
     --progress-rest: #c9dcf3;
 
+    /* Gráficas: validados para distinguirse entre sí, también con daltonismo */
+    --chart-alto: #cf3c3c;
+    --chart-medio: #e8a33a;
+    --chart-bajo: #3fae82;
+    --chart-pendiente: #2f74d0;
+
     /* Geometría y efectos */
     --radius: 12px;
     --radius-sm: 8px;
@@ -113,6 +119,11 @@
     --bg-glass: rgba(22, 33, 50, .85);
     --sidebar-bg: linear-gradient(180deg, #162132 0%, #142030 60%, #13261f 100%);
     --progress-rest: #2c4262;
+
+    --chart-alto: #c23c3c;
+    --chart-medio: #bf8818;
+    --chart-bajo: #3aa87c;
+    --chart-pendiente: #4a8fe0;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
@@ -728,6 +739,12 @@ img {
     text-align: left;
     border-bottom: 1px solid var(--border-soft);
     white-space: nowrap;
+}
+
+/* Texto largo: las demás celdas no se parten, pero esta se leería cortada. */
+.table td.celda-texto {
+    min-width: 24rem;
+    white-space: normal;
 }
 
 .table thead th {
@@ -2150,6 +2167,43 @@ input[type="file"]::file-selector-button:hover {
     text-transform: uppercase;
     letter-spacing: .08em;
     color: var(--text-muted);
+}
+
+/* Dashboard. Sin min-width: 0 el canvas no deja encoger la columna de la rejilla. */
+.card-grafica {
+    min-width: 0;
+}
+
+.chart-box {
+    position: relative;
+    height: 260px;
+}
+
+.chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    margin: 0;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.lista-alertas {
+    display: grid;
+    gap: .85rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-alertas-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .25rem;
+    font-size: .85rem;
 }
 
 /* Tres segmentos que siempre suman 100%: aprobadas, fallidas y el resto. */

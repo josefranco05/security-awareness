@@ -1,0 +1,52 @@
+{
+  "chosen": {
+    "features": "palabras+caracteres",
+    "caracteres": true,
+    "manuales": false,
+    "C": 3.0
+  },
+  "selection_method": "CV estratificada de 5 pliegues sobre train, evaluada en Spaphish",
+  "selection": {
+    "palabras": {
+      "f1": 0.8875,
+      "roc_auc": 0.9741,
+      "f1_all_sources": 0.963,
+      "fit_seconds": 4.6
+    },
+    "palabras+caracteres": {
+      "f1": 0.9102,
+      "roc_auc": 0.9786,
+      "f1_all_sources": 0.97,
+      "fit_seconds": 16.6
+    },
+    "palabras+manuales": {
+      "f1": 0.8786,
+      "roc_auc": 0.9569,
+      "f1_all_sources": 0.9539,
+      "fit_seconds": 5.8
+    },
+    "palabras+caracteres+manuales": {
+      "f1": 0.8984,
+      "roc_auc": 0.97,
+      "f1_all_sources": 0.962,
+      "fit_seconds": 21.7
+    },
+    "palabras+caracteres C=0.3": {
+      "f1": 0.8744,
+      "roc_auc": 0.9642,
+      "f1_all_sources": 0.9585,
+      "fit_seconds": 12.5
+    },
+    "palabras+caracteres C=3": {
+      "f1": 0.9383,
+      "roc_auc": 0.9854,
+      "f1_all_sources": 0.9786,
+      "fit_seconds": 14.5
+    }
+  },
+  "train_rows": 2416,
+  "train_sources": [
+    "Spaphish",
+    "SpearPhishMX"
+  ]
+}

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from core.permisos import UsuarioPropio
+from schemas.phishing import TokenExtensionCreado
 from schemas.usuarios import UserCreate, UserPublic, UserPrivate, UserUpdate
 from database.async_database import get_db
 from core.auth import (
@@ -16,6 +19,7 @@ from core.auth import (
     CurrentUser,
     create_access_token,
     hash_password,
+    nuevo_token_extension,
     set_auth_cookie,
     clear_auth_cookie,
     _credentials_exception)
@@ -57,6 +61,44 @@ async def login_for_access_token(
 )
 async def logout(response: Response):
     clear_auth_cookie(response)
+
+
+# TOKEN DE LA EXTENSIÓN
+@router.post(
+        "/me/token-extension",
+        response_model=TokenExtensionCreado,
+        status_code=status.HTTP_201_CREATED
+)
+async def generar_token_extension(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    # Uno por usuario: generar otro invalida el anterior. Esta es la única vez que se ve.
+    token, token_hash = nuevo_token_extension()
+    fila = await db.scalar(
+        select(models.TokenExtension).where(models.TokenExtension.owner == current_user.uid)
+    )
+    if fila is None:
+        db.add(models.TokenExtension(owner=current_user.uid, token_hash=token_hash))
+    else:
+        fila.token_hash = token_hash
+        fila.creado = datetime.now(UTC)
+    await db.commit()
+    return TokenExtensionCreado(token=token)
+
+
+@router.delete(
+        "/me/token-extension",
+        status_code=status.HTTP_204_NO_CONTENT
+)
+async def revocar_token_extension(
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    await db.execute(
+        delete(models.TokenExtension).where(models.TokenExtension.owner == current_user.uid)
+    )
+    await db.commit()
 
 
 # CRUD
@@ -138,7 +180,7 @@ async def eliminar_usuario(
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    # Borra en cascada sus campañas, empleados y simulaciones (ver models.User).
+    # Borra en cascada sus campañas, empleados, simulaciones, detecciones y token (ver models.User).
     await db.delete(usuario)
     await db.commit()
     clear_auth_cookie(response)

@@ -27,17 +27,14 @@ stages:
         versionSpec: '$(pythonVersion)'
       displayName: 'Use Python $(pythonVersion)'
 
+    # --frozen: instala exactamente uv.lock y falla si no coincide con pyproject.toml.
     - script: |
-        python -m venv antenv
-        source antenv/bin/activate
-        python -m pip install --upgrade pip
-        pip install setup
-        pip install -r requirements.txt
+        python -m pip install uv==0.11.29
+        uv sync --frozen --no-dev
       workingDirectory: $(projectRoot)
-      displayName: "Install requirements"
+      displayName: "Install dependencies (uv)"
 
     - script: |
-        source antenv/bin/activate
         # Valores ficticios solo para el import; los reales están en las App Settings.
         # Van en línea y no en env: para que ninguna variable del pipeline los pise.
         SECRET_KEY=build-only-dummy \
@@ -48,24 +45,23 @@ stages:
         CELERY_BROKER_URL=memory:// \
         EMAIL_BACKEND=log \
         ALLOWED_ORIGINS='["http://localhost"]' \
-        python -c "import main; print('main.py imports OK')"
+        uv run --frozen --no-dev python -c "import main; from ml.inferencia import cargar_modelo; cargar_modelo(); print('main.py y modelo OK')"
       workingDirectory: $(projectRoot)
-      displayName: "Validate main.py imports"
+      displayName: "Validate main.py imports and model"
 
     # El repo guarda el CSS legible; el paquete se despliega minificado.
-    # rcssmin solo se instala en el agente de build, no en requirements.txt.
+    # rcssmin solo existe en este paso: no es dependencia de la app.
     - script: |
-        source antenv/bin/activate
-        pip install rcssmin
-        python -c "import pathlib, rcssmin; p = pathlib.Path('static/css/style.css'); antes = p.stat().st_size; p.write_text(rcssmin.cssmin(p.read_text(encoding='utf-8')), encoding='utf-8'); print(f'style.css: {antes} -> {p.stat().st_size} bytes')"
+        uv run --frozen --no-dev --with rcssmin python -c "import pathlib, rcssmin; p = pathlib.Path('static/css/style.css'); antes = p.stat().st_size; p.write_text(rcssmin.cssmin(p.read_text(encoding='utf-8')), encoding='utf-8'); print(f'style.css: {antes} -> {p.stat().st_size} bytes')"
       workingDirectory: $(projectRoot)
       displayName: "Minify CSS"
 
+    # App Service instala las dependencias con uv al desplegar, desde pyproject.toml y uv.lock.
     - script: |
         chmod +x startup.sh
-        rm -rf antenv
+        rm -rf .venv
       workingDirectory: $(projectRoot)
-      displayName: "Prep for archive (chmod + drop build venv)"
+      displayName: "Prep for archive (chmod, drop build venv)"
 
     - task: ArchiveFiles@2
       displayName: 'Archive files'

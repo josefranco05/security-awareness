@@ -1,28 +1,11 @@
 {% extends "layout.html" %}
 
 {% set active_page = 'dashboard' %}
-{% set s = stats | default({}) %}
+
+{% set clases_nivel = {'alto': 'risk-high', 'medio': 'risk-medium', 'bajo': 'risk-low'} %}
+{% set textos_etiqueta = {'phishing': 'Phishing', 'sospechoso': 'Sospechoso', 'legitimo': 'Legítimo'} %}
 
 {% block title %}Dashboard · Security Awareness{% endblock %}
-
-{% block head %}
-<style>
-    /* Espacio   reservado para las futuras gráficas */
-    .chart-placeholder {
-        min-height: 260px;
-        border: 2px dashed var(--border);
-        border-radius: var(--radius);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-muted);
-        background: var(--bg-page);
-        font-size: .9rem;
-        text-align: center;
-        padding: 1rem;
-    }
-</style>
-{% endblock %}
 
 {% block content %}
 <div class="mb-3">
@@ -34,82 +17,102 @@
 <div class="stat-grid mb-3">
     <div class="stat-card">
         <div class="stat-label">Empleados</div>
-        <div class="stat-value">{{ s.get('empleados', '—') }}</div>
+        <div class="stat-value" data-stat="empleados">{{ stats.empleados }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Campañas activas</div>
-        <div class="stat-value">{{ s.get('campanas_activas', '—') }}</div>
+        <div class="stat-value" data-stat="campanas_activas">{{ stats.campanas_activas }}</div>
+        {# Quitar junto con DIAS_COMPLETADA_PRUEBA cuando exista el píxel de seguimiento. #}
+        <span class="badge badge-neutral" title="Sin seguimiento de aperturas, un correo enviado hace más de 7 días se da por completado.">Datos de prueba</span>
     </div>
     <div class="stat-card">
         <div class="stat-label">Correos detectados</div>
-        <div class="stat-value">{{ s.get('correos_detectados', '—') }}</div>
+        <div class="stat-value" data-stat="correos_detectados">{{ stats.correos_detectados }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Tasa de clics en simulacros</div>
-        <div class="stat-value">{{ s.get('tasa_clics', '—') }}<span class="unit">%</span></div>
+        <div class="stat-label">Tasa de entrega</div>
+        <div class="stat-value" data-stat="tasa_entrega">
+            {%- if stats.tasa_entrega is none %}—{% else %}{{ stats.tasa_entrega }}<span class="unit">%</span>{% endif -%}
+        </div>
     </div>
 </div>
 
-<!-- ===================== Gráficas (espacios reservados) ===================== -->
+<!-- ===================== Gráficas ===================== -->
 <div class="grid grid-2">
 
-    <div class="card">
+    <div class="card card-grafica">
         <div class="card-header">
-            <h2 class="card-title">Evolución del nivel de riesgo</h2>
-            <span class="badge badge-neutral">Por definir</span>
+            <h2 class="card-title">Detecciones por día</h2>
+            <span class="badge badge-neutral">Últimos 30 días</span>
         </div>
-        <div class="chart-placeholder" id="chart-risk-evolution">
-            Gráfica pendiente de implementar
+        {% if graficas.detecciones.total %}
+        <div class="chart-box">
+            <canvas id="chart-detecciones" role="img"
+                aria-label="Correos analizados por día y nivel de riesgo: {{ graficas.detecciones.total }} en los últimos 30 días"></canvas>
         </div>
+        {% else %}
+        <p class="chart-empty">No hay correos analizados en los últimos 30 días.</p>
+        {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card card-grafica">
         <div class="card-header">
             <h2 class="card-title">Resultados de campañas</h2>
-            <span class="badge badge-neutral">Por definir</span>
+            <span class="badge badge-neutral">Últimas 8</span>
         </div>
-        <div class="chart-placeholder" id="chart-campaign-results">
-            Gráfica pendiente de implementar
+        {% if graficas.campanas.nombres %}
+        <div class="chart-box">
+            <canvas id="chart-campanas" role="img"
+                aria-label="Correos entregados, pendientes y fallidos de las últimas {{ graficas.campanas.nombres|length }} campañas"></canvas>
         </div>
+        {% else %}
+        <p class="chart-empty">Aún no hay campañas.</p>
+        {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card card-grafica">
         <div class="card-header">
             <h2 class="card-title">Historial de alertas</h2>
-            <span class="badge badge-neutral">Por definir</span>
+            <a class="badge badge-neutral" href="{{ url_for('deteccion') }}">Ver todas</a>
         </div>
-        <div class="chart-placeholder" id="chart-alerts-history">
-            Gráfica pendiente de implementar
-        </div>
+        {% if alertas %}
+        <ul class="lista-alertas">
+            {% for a in alertas %}
+            <li>
+                <div class="lista-alertas-cabecera">
+                    <span class="badge {{ clases_nivel[a.nivel] }}">{{ textos_etiqueta[a.etiqueta] }}</span>
+                    <span class="text-muted">{{ a.fecha.strftime('%d/%m/%Y %H:%M') }}</span>
+                </div>
+                <div class="text-secondary">{{ a.razon }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="chart-empty">No hay alertas registradas.</p>
+        {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card card-grafica">
         <div class="card-header">
-            <h2 class="card-title">Detecciones por tipo de amenaza</h2>
-            <span class="badge badge-neutral">Por definir</span>
+            <h2 class="card-title">Señales de las amenazas</h2>
+            <span class="badge badge-neutral" title="Un correo que falla varias verificaciones cuenta solo en la más fuerte.">Cada correo cuenta una vez</span>
         </div>
-        <div class="chart-placeholder" id="chart-threat-types">
-            Gráfica pendiente de implementar
+        {% if stats.correos_detectados %}
+        <div class="chart-box">
+            <canvas id="chart-senales" role="img"
+                aria-label="Señal principal de las {{ stats.correos_detectados }} amenazas detectadas"></canvas>
         </div>
+        {% else %}
+        <p class="chart-empty">Aún no hay amenazas detectadas.</p>
+        {% endif %}
     </div>
 
 </div>
+
+<script type="application/json" id="datos-graficas">{{ graficas | tojson }}</script>
 {% endblock %}
 
 {% block scripts %}
-{# ============================================================
-   GRÁFICAS — PENDIENTE (decisión futura)
-   Los contenedores ya están reservados con sus IDs:
-     #chart-risk-evolution    → línea: evolución del riesgo
-     #chart-campaign-results  → barras: aperturas vs clics
-     #chart-alerts-history    → historial de alertas
-     #chart-threat-types      → dona: detecciones por tipo
-
-   Aquí puedes cargar la librería que elijas (Chart.js, ECharts,
-   ApexCharts...) e inicializar cada gráfica. Ejemplo con Chart.js:
-     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-     <script>
-       new Chart(document.getElementById('chart-risk-evolution'), { /* ... */ });
-     </script>
-   ============================================================ #}
+<script src="{{ static_url('vendor/chart-4.6.1.umd.min.js') }}"></script>
+<script src="{{ static_url('js/dashboard.js') }}"></script>
 {% endblock %}

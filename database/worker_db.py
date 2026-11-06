@@ -1,8 +1,8 @@
-"""Acceso a datos para el worker de Celery.
+"""Acceso síncrono a datos, para el worker de Celery y los endpoints `def`.
 
 El motor de database/async_database.py es ASÍNCRONO y está atado al event loop donde se creó.
-Reutilizarlo desde una tarea síncrona provoca "attached to a different loop",
-así que el worker tiene su propio motor síncrono sobre la misma base de datos.
+Reutilizarlo desde código síncrono provoca "attached to a different loop", así que
+aquí hay un motor síncrono sobre la misma base de datos.
 """
 from __future__ import annotations
 

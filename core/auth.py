@@ -14,19 +14,23 @@ páginas HTML el handler de main.py lo convierte en redirección a /login.
 """
 from __future__ import annotations
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, Request, Response, status
-from fastapi.security import APIKeyCookie
+from fastapi.security import APIKeyCookie, HTTPAuthorizationCredentials, HTTPBearer
 from pwdlib import PasswordHash
 from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from core.config import settings
 from database.async_database import get_db
+from database.worker_db import SessionLocal
 from schemas.usuarios import Token
 
 
@@ -165,9 +169,57 @@ async def get_optional_user(
 OptionalUser = Annotated[models.User | None, Depends(get_optional_user)]
 
 
+# --- Token de la extensión ---------------------------------------------------
+PREFIJO_TOKEN_EXTENSION = "snt_"
+
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def hash_token_extension(token: str) -> str:
+    # SHA-256 y no Argon2: el token son 256 bits aleatorios, no una contraseña que
+    # se pueda adivinar. Además permite buscarlo por su hash en cada análisis.
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def nuevo_token_extension() -> tuple[str, str]:
+    """Devuelve (token, hash). El token solo existe en la respuesta que se lo entrega al usuario."""
+    token = PREFIJO_TOKEN_EXTENSION + secrets.token_urlsafe(32)
+    return token, hash_token_extension(token)
+
+
+def require_extension_token(
+    credenciales: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> int:
+    """Devuelve el uid dueño del token. Es síncrona porque corre junto a un endpoint `def`.
+
+    La cookie de sesión no sirve aquí: esta ruta no exige Origin, así que aceptarla abriría CSRF.
+    """
+    if credenciales is None or not credenciales.credentials.startswith(PREFIJO_TOKEN_EXTENSION):
+        raise _token_extension_invalido
+    try:
+        with SessionLocal() as db:
+            uid = db.scalar(
+                select(models.TokenExtension.owner).where(
+                    models.TokenExtension.token_hash == hash_token_extension(credenciales.credentials)
+                )
+            )
+    except SQLAlchemyError:
+        # Sin poder comprobar el token no se deja pasar a nadie.
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Servicio no disponible.")
+    if uid is None:
+        raise _token_extension_invalido
+    return uid
+
+
 _credentials_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="No se pudieron validar las credenciales.",
+)
+
+_token_extension_invalido = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Token de la extensión inválido.",
+    headers={"WWW-Authenticate": "Bearer"},
 )
 
 _token_expired = HTTPException(

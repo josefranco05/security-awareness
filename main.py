@@ -15,7 +15,6 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from typing import Optional, Annotated, Literal
-from datetime import datetime, UTC
 from contextlib import asynccontextmanager
 
 from pydantic import ValidationError
@@ -39,9 +38,13 @@ import logging
 
 import models
 from database.async_database import Base, engine, get_db
-from routers import campañas as campañas_router, empleados, simulaciones, webhooks, usuarios
+from routers import campañas as campañas_router, empleados, phishing, simulaciones, webhooks, usuarios
 from core.auth import get_current_user, CurrentUser, OptionalUser
 from core.config import settings
+from core.fechas import fecha_local
+from core.limites import LimiteTamañoPeticion
+from ml.inferencia import cargar_modelo
+from services.dashboard import resumen_dashboard
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -68,6 +71,8 @@ async def lifespan(_app: FastAPI):
     # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Sin modelo válido la app no arranca: un pickle incompatible predeciría mal sin avisar.
+    _app.state.modelo_phishing = cargar_modelo()
     yield
     # Shutdown
     await engine.dispose()
@@ -112,6 +117,7 @@ app.include_router(empleados.router, prefix="/api/empleados", tags=["empleados"]
 app.include_router(campañas_router.router, prefix="/api/campañas", tags=["campañas"], dependencies=auth_required)
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+app.include_router(phishing.router, prefix="/api/phishing", tags=["phishing"])
 
 
 # Flash messages, exponen get_flashed_messages() dentro de los templates
@@ -131,8 +137,9 @@ async def request_context(request: Request, call_next):
 # nuestros propios orígenes. SameSite=Lax no basta porque los subdominios de
 # sentinel.world cuentan como el mismo "site".
 METODOS_INSEGUROS = {"POST", "PUT", "PATCH", "DELETE"}
-# Event Grid llama servidor a servidor, sin cabecera Origin.
-RUTAS_SIN_ORIGEN = ("/api/webhooks/",)
+# Event Grid llama servidor a servidor, sin cabecera Origin. La extensión llega con
+# Origin chrome-extension:// y se autentica con bearer token, no con la cookie: no aplica CSRF.
+RUTAS_SIN_ORIGEN = ("/api/webhooks/", phishing.RUTA_ANALISIS)
 
 
 @app.middleware("http")
@@ -170,6 +177,14 @@ async def cabeceras_cache(request: Request, call_next):
     return response
 
 
+# Se añade después de los demás para quedar por fuera: corta antes de que nadie lea el cuerpo.
+app.add_middleware(
+    LimiteTamañoPeticion,
+    ruta=phishing.RUTA_ANALISIS,
+    max_bytes=phishing.MAX_BYTES_PETICION,
+)
+
+
 def flash(request: Request, message: str, category: str = "info") -> None:
     request.session.setdefault("_flashes", []).append((category, message))
 
@@ -204,17 +219,11 @@ async def landing(request: Request):
 
 
 @app.get("/dashboard", name="dashboard", include_in_schema=False)
-async def dashboard(request: Request, current_user: CurrentUser):
-    stats = {
-        "empleados": 48,
-        "campanas_activas": 2,
-        "correos_detectados": 132,
-        "tasa_clics": 18,
-    }
+async def dashboard(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"stats": stats}
+        await resumen_dashboard(db, current_user.uid),
     )
 
 @app.get("/empleados", name="empleados", include_in_schema=False)
@@ -294,9 +303,46 @@ async def campañas(request: Request, current_user: CurrentUser, db: Annotated[A
         {"campanas": campanas, "simulaciones": simulaciones},
     )
 
+MAX_DETECCIONES_PAGINA = 100
+
+
 @app.get("/deteccion", name="deteccion", include_in_schema=False)
-async def deteccion(request: Request, current_user: CurrentUser):
-    return templates.TemplateResponse(request, "deteccion.html", {})
+async def deteccion(request: Request, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    propias = models.Deteccion.owner == current_user.uid
+
+    # Se cuenta en SQL: los indicadores cubren todo el historial, no solo la tabla.
+    filas = await db.execute(
+        select(models.Deteccion.nivel, func.count()).where(propias).group_by(models.Deteccion.nivel)
+    )
+    por_nivel = {nivel: total for nivel, total in filas.all()}
+    alto, medio = por_nivel.get("alto", 0), por_nivel.get("medio", 0)
+    analizados = sum(por_nivel.values())
+
+    recientes = await db.scalars(
+        select(models.Deteccion)
+        .where(propias)
+        .order_by(models.Deteccion.fecha.desc(), models.Deteccion.id.desc())
+        .limit(MAX_DETECCIONES_PAGINA)
+    )
+    detecciones = [
+        {
+            "fecha": fecha_local(d.fecha),
+            "etiqueta": d.etiqueta,
+            "nivel": d.nivel,
+            "probabilidad": d.probabilidad,
+            "reglas": d.reglas,
+            "razones": d.razones,
+        }
+        for d in recientes
+    ]
+    return templates.TemplateResponse(
+        request,
+        "deteccion.html",
+        {
+            "stats": {"analizados": analizados, "detectados": alto + medio, "riesgo_alto": alto, "riesgo_medio": medio},
+            "detections": detecciones,
+        },
+    )
 
 
 @app.get(
@@ -334,12 +380,26 @@ async def cuenta(request: Request, current_user: CurrentUser, db: Annotated[Asyn
         .join(models.Simulaciones.campana)
         .where(models.Campaña.owner == current_user.uid)
     )
+    detecciones = await db.scalar(
+        select(func.count())
+        .select_from(models.Deteccion)
+        .where(models.Deteccion.owner == current_user.uid)
+    )
+    token_creado = await db.scalar(
+        select(models.TokenExtension.creado).where(models.TokenExtension.owner == current_user.uid)
+    )
     return templates.TemplateResponse(
         request,
         "cuenta.html",
         {
             "usuario": current_user,
-            "conteos": {"campanas": campañas, "empleados": empleados, "simulaciones": simulaciones},
+            "conteos": {
+                "campanas": campañas,
+                "empleados": empleados,
+                "simulaciones": simulaciones,
+                "detecciones": detecciones,
+            },
+            "token_creado": token_creado,
         },
     )
 
@@ -411,7 +471,17 @@ async def general_http_exception_handler(
     )
 
 @app.exception_handler(RequestValidationError)
-async def general_validation_error(request: Request, exception: RequestValidationError): 
+async def general_validation_error(request: Request, exception: RequestValidationError):
+    # El 422 por defecto repite `input`: aquí sería el contenido del correo.
+    if request.url.path == phishing.RUTA_ANALISIS:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": [
+                {"type": e["type"], "loc": e["loc"], "msg": e["msg"]}
+                for e in exception.errors()
+            ]},
+        )
+
     if request.url.path.startswith("/api"):
         return await request_validation_exception_handler(request, exception)
     

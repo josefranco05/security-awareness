@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # como JSON, p. ej.: ALLOWED_ORIGINS='["https://app.sentinel.world"]'
     ALLOWED_ORIGINS: list[str]
 
+    # --- Análisis de phishing ------------------------------------------
+    # Por usuario y por worker de gunicorn: el tope real es este × WEB_CONCURRENCY.
+    ANALISIS_POR_MINUTO: int = 30
+
     @field_validator("EMAIL_BACKEND", mode="before")
     @classmethod
     def _normalizar_backend(cls, valor: object) -> object:

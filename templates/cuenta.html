@@ -74,6 +74,31 @@
             </form>
         </section>
 
+        <!-- ===================== Extensión del navegador ===================== -->
+        <section class="card">
+            <h2 class="card-title">Extensión del navegador</h2>
+            <p class="card-subtitle mb-2">Pega este token en la extensión de Sentinel para analizar tus correos.</p>
+
+            <p class="text-secondary" id="tokenEstado">
+                {% if token_creado %}Token activo desde {{ token_creado.strftime('%d/%m/%Y') }}.{% else %}Aún no has generado un token.{% endif %}
+            </p>
+
+            <div class="form-group mt-2" id="tokenNuevo" hidden>
+                <label for="tokenValor">Cópialo ahora: no se volverá a mostrar.</label>
+                <input type="text" id="tokenValor" readonly autocomplete="off" spellcheck="false">
+                <button type="button" class="btn btn-secondary btn-sm mt-2" id="btnCopiarToken">Copiar</button>
+            </div>
+
+            <p class="field-error" id="errorToken" role="alert" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-ghost-danger" id="btnRevocarToken" {% if not token_creado %}hidden{% endif %}>Revocar</button>
+                <button type="button" class="btn btn-primary" id="btnGenerarToken" data-reemplaza="{{ 'true' if token_creado else 'false' }}">
+                    {{ 'Generar uno nuevo' if token_creado else 'Generar token' }}
+                </button>
+            </div>
+        </section>
+
         <!-- ===================== Zona de peligro ===================== -->
         <section class="card card-danger">
             <h2 class="card-title">Eliminar cuenta</h2>
@@ -109,8 +134,9 @@
                     Se eliminarán de forma <strong>permanente</strong> tu cuenta y
                     <strong>todos</strong> tus datos:
                     <strong>{{ conteos.campanas }}</strong> campañas,
-                    <strong>{{ conteos.empleados }}</strong> empleados y
-                    <strong>{{ conteos.simulaciones }}</strong> simulaciones con todos sus resultados.
+                    <strong>{{ conteos.empleados }}</strong> empleados,
+                    <strong>{{ conteos.simulaciones }}</strong> simulaciones con todos sus resultados y
+                    <strong>{{ conteos.detecciones }}</strong> detecciones.
                     No hay forma de recuperarlos. Continúa solo si estás completamente seguro.
                 </p>
             </div>
@@ -205,6 +231,60 @@
             errorEliminar.textContent = getErrorMessage(body);
             errorEliminar.hidden = false;
             btnEliminar.disabled = false;
+        });
+
+        // Token de la extensión: el servidor solo guarda su hash, así que solo se ve aquí.
+        var urlToken = "/api/usuarios/me/token-extension";
+        var btnGenerar = document.getElementById("btnGenerarToken");
+        var btnRevocar = document.getElementById("btnRevocarToken");
+        var tokenEstado = document.getElementById("tokenEstado");
+        var tokenNuevo = document.getElementById("tokenNuevo");
+        var tokenValor = document.getElementById("tokenValor");
+        var errorToken = document.getElementById("errorToken");
+
+        function pintarToken(activo) {
+            tokenEstado.textContent = activo ? "Token activo desde hoy." : "Aún no has generado un token.";
+            btnGenerar.textContent = activo ? "Generar uno nuevo" : "Generar token";
+            btnGenerar.dataset.reemplaza = activo ? "true" : "false";
+            btnRevocar.hidden = !activo;
+            errorToken.hidden = true;
+        }
+
+        async function errorDeToken(r) {
+            var body = await r.json().catch(function () { return {}; });
+            errorToken.textContent = getErrorMessage(body);
+            errorToken.hidden = false;
+        }
+
+        btnGenerar.addEventListener("click", async function () {
+            if (btnGenerar.dataset.reemplaza === "true" &&
+                !window.confirm("El token actual dejará de funcionar. ¿Generar uno nuevo?")) return;
+            btnGenerar.disabled = true;
+            try {
+                var r = await Auth.fetch(urlToken, { method: "POST" });
+                if (!r.ok) { await errorDeToken(r); return; }
+                tokenValor.value = (await r.json()).token;
+                tokenNuevo.hidden = false;
+                pintarToken(true);
+                tokenValor.select();
+            } finally {
+                btnGenerar.disabled = false;
+            }
+        });
+
+        btnRevocar.addEventListener("click", async function () {
+            if (!window.confirm("La extensión dejará de funcionar hasta que generes otro token. ¿Revocarlo?")) return;
+            var r = await Auth.fetch(urlToken, { method: "DELETE" });
+            if (!r.ok) { await errorDeToken(r); return; }
+            tokenValor.value = "";
+            tokenNuevo.hidden = true;
+            pintarToken(false);
+        });
+
+        // navigator.clipboard solo existe en HTTPS y localhost; si falta, queda seleccionado.
+        document.getElementById("btnCopiarToken").addEventListener("click", async function () {
+            tokenValor.select();
+            if (navigator.clipboard) await navigator.clipboard.writeText(tokenValor.value);
         });
     })();
 </script>

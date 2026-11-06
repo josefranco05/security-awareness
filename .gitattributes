@@ -1,2 +1,5 @@
 # Los scripts de shell se ejecutan en Linux (App Service): siempre con LF.
 *.sh text eol=lf
+
+# El modelo es un pickle: cualquier conversión de saltos de línea lo corrompe.
+*.joblib binary

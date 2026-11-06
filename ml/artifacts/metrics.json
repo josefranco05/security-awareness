@@ -1,0 +1,190 @@
+{
+  "created": "2026-11-03T08:12:39+00:00",
+  "python_version": "3.14.0",
+  "sklearn_version": "1.9.1",
+  "datasets": {
+    "Spaphish": {
+      "rows": 1392,
+      "splits": {
+        "train": 1113,
+        "test": 279
+      }
+    },
+    "SpearPhishMX": {
+      "rows": 1629,
+      "splits": {
+        "train": 1303,
+        "test": 326
+      }
+    }
+  },
+  "model": {
+    "chosen": {
+      "features": "palabras+caracteres",
+      "caracteres": true,
+      "manuales": false,
+      "C": 3.0
+    },
+    "selection_method": "CV estratificada de 5 pliegues sobre train, evaluada en Spaphish",
+    "selection": {
+      "palabras": {
+        "f1": 0.8875,
+        "roc_auc": 0.9741,
+        "f1_all_sources": 0.963,
+        "fit_seconds": 4.6
+      },
+      "palabras+caracteres": {
+        "f1": 0.9102,
+        "roc_auc": 0.9786,
+        "f1_all_sources": 0.97,
+        "fit_seconds": 16.6
+      },
+      "palabras+manuales": {
+        "f1": 0.8786,
+        "roc_auc": 0.9569,
+        "f1_all_sources": 0.9539,
+        "fit_seconds": 5.8
+      },
+      "palabras+caracteres+manuales": {
+        "f1": 0.8984,
+        "roc_auc": 0.97,
+        "f1_all_sources": 0.962,
+        "fit_seconds": 21.7
+      },
+      "palabras+caracteres C=0.3": {
+        "f1": 0.8744,
+        "roc_auc": 0.9642,
+        "f1_all_sources": 0.9585,
+        "fit_seconds": 12.5
+      },
+      "palabras+caracteres C=3": {
+        "f1": 0.9383,
+        "roc_auc": 0.9854,
+        "f1_all_sources": 0.9786,
+        "fit_seconds": 14.5
+      }
+    },
+    "train_rows": 2416,
+    "train_sources": [
+      "Spaphish",
+      "SpearPhishMX"
+    ]
+  },
+  "thresholds": {
+    "decision": 0.5,
+    "low_max": 0.4,
+    "high_min": 0.7
+  },
+  "test_spaphish": {
+    "source": "Spaphish",
+    "n": 279,
+    "positives": 146,
+    "precision": 1.0,
+    "recall": 0.9247,
+    "f1": 0.9609,
+    "confusion_matrix": {
+      "tn": 133,
+      "fp": 0,
+      "fn": 11,
+      "tp": 135
+    },
+    "roc_auc": 0.997,
+    "at_thresholds": {
+      "0.4": {
+        "precision": 0.9929,
+        "recall": 0.9521,
+        "f1": 0.972
+      },
+      "0.7": {
+        "precision": 1.0,
+        "recall": 0.863,
+        "f1": 0.9265
+      }
+    },
+    "levels_by_label": {
+      "legitimate": {
+        "low": 132,
+        "medium": 1,
+        "high": 0
+      },
+      "phishing": {
+        "high": 126,
+        "medium": 13,
+        "low": 7
+      }
+    }
+  },
+  "test_all": {
+    "n": 605,
+    "positives": 472,
+    "precision": 1.0,
+    "recall": 0.9746,
+    "f1": 0.9871,
+    "confusion_matrix": {
+      "tn": 133,
+      "fp": 0,
+      "fn": 12,
+      "tp": 460
+    },
+    "roc_auc": 0.9986,
+    "at_thresholds": {
+      "0.4": {
+        "precision": 0.9978,
+        "recall": 0.9831,
+        "f1": 0.9904
+      },
+      "0.7": {
+        "precision": 1.0,
+        "recall": 0.9492,
+        "f1": 0.9739
+      }
+    },
+    "levels_by_label": {
+      "legitimate": {
+        "low": 132,
+        "medium": 1,
+        "high": 0
+      },
+      "phishing": {
+        "high": 448,
+        "medium": 16,
+        "low": 8
+      }
+    },
+    "by_source": {
+      "Spaphish": {
+        "n": 279,
+        "positives": 146,
+        "precision": 1.0,
+        "recall": 0.9247,
+        "f1": 0.9609,
+        "confusion_matrix": {
+          "tn": 133,
+          "fp": 0,
+          "fn": 11,
+          "tp": 135
+        },
+        "roc_auc": 0.997
+      },
+      "SpearPhishMX": {
+        "n": 326,
+        "positives": 326,
+        "precision": 1.0,
+        "recall": 0.9969,
+        "f1": 0.9985,
+        "confusion_matrix": {
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "tp": 325
+        }
+      }
+    }
+  },
+  "mvp_target": {
+    "metric": "test_spaphish.f1",
+    "target": 0.9,
+    "value": 0.9609,
+    "met": true
+  }
+}

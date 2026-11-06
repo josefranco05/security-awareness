@@ -11,6 +11,7 @@ dependencies = [
     # Web
     "fastapi[standard]>=0.141",
     "uvicorn[standard]>=0.53",
+    "uvicorn-worker",
     "gunicorn>=26.0",
     "starlette>=1.6",
     "pydantic>=2.13",
@@ -29,7 +30,18 @@ dependencies = [
     "pwdlib[argon2]",
     "pyjwt",
     "pydantic-settings>=2.16.0",
+    "joblib>=1.6.0",
+    "pandas>=3.1.1",
+    # Exacta: model.joblib se entrenó con esta versión y cargar_modelo() rechaza otra.
+    "scikit-learn==1.9.1",
 ]
+
+[dependency-groups]
+dev = ["pytest>=9.2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "ml/tests"]
+pythonpath = ["."]
 
 [tool.uv]
 # Aplicación (no librería): no se construye ni instala como paquete.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, UTC
 
-from sqlalchemy import DateTime, String, Integer, ForeignKey, Text, Boolean, UniqueConstraint
+from sqlalchemy import DateTime, Float, JSON, String, Integer, ForeignKey, Text, Boolean, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.async_database import Base
@@ -21,8 +21,12 @@ class User(Base):
     # Al borrar el usuario se borran sus datos (owner es NOT NULL).
     campanas: Mapped[list[Campaña]] = relationship("Campaña", back_populates="user", cascade="all, delete-orphan")
     empleados: Mapped[list[Empleados]] = relationship("Empleados", back_populates="user", cascade="all, delete-orphan")
+    detecciones: Mapped[list[Deteccion]] = relationship("Deteccion", back_populates="user", cascade="all, delete-orphan")
+    token_extension: Mapped[TokenExtension | None] = relationship(
+        "TokenExtension", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
-    
+
 class Campaña(Base):
     __tablename__ = "campanas"
 
@@ -76,5 +80,38 @@ class Simulaciones(Base):
 
     empleados: Mapped[Empleados] = relationship(back_populates="simulaciones")
     campana: Mapped[Campaña] = relationship(back_populates="simulaciones")
+
+
+class Deteccion(Base):
+    """Resultado de un análisis. No guarda el correo: ni cuerpo, ni asunto, ni URLs."""
+
+    __tablename__ = "detecciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Nivel final, después de las reglas. Es el que se muestra.
+    nivel: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    # Salida cruda del modelo, antes de las reglas: no sirve para derivar el nivel.
+    probabilidad: Mapped[float] = mapped_column(Float, nullable=False)
+    reglas: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Puede citar hasta 3 términos del correo; solo debe verlo su dueño.
+    razones: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+
+    user: Mapped[User] = relationship("User", back_populates="detecciones")
+
+
+class TokenExtension(Base):
+    """Token de la extensión del navegador: uno por usuario, y solo se guarda su hash."""
+
+    __tablename__ = "tokens_extension"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    creado: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+
+    user: Mapped[User] = relationship("User", back_populates="token_extension")
 
 
