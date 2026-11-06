@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Sentinel</title>
+  <style>
+    :root { color-scheme: light dark; --borde: #8886; --alto: #c62828; --medio: #b26a00; --bajo: #2e7d32; }
+    body { width: 300px; margin: 0; padding: 12px; font: 13px/1.4 system-ui, sans-serif; }
+    h1 { margin: 0 0 10px; font-size: 15px; }
+    form { display: flex; gap: 6px; }
+    input { flex: 1; min-width: 0; padding: 5px 6px; border: 1px solid var(--borde); border-radius: 4px; }
+    button { padding: 5px 8px; cursor: pointer; }
+    #analizar { width: 100%; margin-top: 10px; padding: 8px; font-weight: 600; }
+    #eliminar { margin-top: 4px; padding: 0; border: 0; background: none; font-size: 12px; text-decoration: underline; }
+    #estado { margin: 10px 0 0; }
+    #estado:empty { display: none; }
+    #resultado { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--borde); }
+    #nivel { margin: 0; font-size: 15px; font-weight: 700; }
+    #nivel.alto { color: var(--alto); }
+    #nivel.medio { color: var(--medio); }
+    #nivel.bajo { color: var(--bajo); }
+    ul { margin: 6px 0; padding-left: 18px; }
+    #aviso { margin: 6px 0 0; font-size: 12px; opacity: .75; }
+  </style>
+</head>
+<body>
+  <h1>Sentinel</h1>
+
+  <form id="form-token">
+    <input id="token" type="password" autocomplete="off" spellcheck="false"
+           placeholder="Token de la extensión" aria-label="Token de la extensión">
+    <button type="submit">Guardar</button>
+  </form>
+  <button id="eliminar" type="button" hidden>Eliminar token</button>
+
+  <button id="analizar" type="button">Analizar este correo</button>
+
+  <p id="estado" role="status"></p>
+
+  <section id="resultado" hidden>
+    <p id="nivel"></p>
+    <ul id="razones"></ul>
+    <p id="aviso" hidden>No se pudo comprobar SPF, DKIM ni DMARC en este correo: el resultado se basa solo en su contenido.</p>
+  </section>
+
+  <script src="auth.js"></script>
+  <script src="lector.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
