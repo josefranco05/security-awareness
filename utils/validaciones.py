@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import HTTPException, status
 
 from sqlalchemy import select, func
@@ -9,9 +11,9 @@ import models
 # VALIDACIONES DE EMPLEADO
 async def validar_email_empleado(
         email: str,
-        owner_id: int,
+        owner_id: UUID,
         db: AsyncSession,
-        id_excluir: int | None = None
+        id_excluir: UUID | None = None
     ):
     query = select(models.Empleados).where(
         models.Empleados.owner == owner_id,
@@ -32,7 +34,7 @@ async def validar_email_empleado(
 async def validar_email_usuario(
         email: str,
         db: AsyncSession,
-        uid_excluir: int | None = None
+        uid_excluir: UUID | None = None
     ):
     query = select(models.User).where(func.lower(models.User.email) == email.lower())
     
@@ -50,7 +52,7 @@ async def validar_email_usuario(
 async def validar_usuario(
         username: str,
         db: AsyncSession,
-        uid_excluir: int | None = None
+        uid_excluir: UUID | None = None
 ):
     query = select(models.User).where(func.lower(models.User.username) == username.lower())
 

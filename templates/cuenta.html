@@ -164,7 +164,7 @@
 {% block scripts %}
 <script>
     (function () {
-        var url = "/api/usuarios/" + {{ usuario.uid | tojson }};
+        var url = "/api/usuarios/" + {{ usuario.uid | string | tojson }};
         var form = document.getElementById("formPerfil");
         var mensaje = document.getElementById("perfilMensaje");
         var confirmar = document.getElementById("confirmarUsuario");

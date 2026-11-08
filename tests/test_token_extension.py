@@ -1,6 +1,8 @@
 """Generación, revocación y verificación del token de la extensión."""
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from sqlalchemy.exc import OperationalError
 
@@ -17,7 +19,7 @@ URL_ANALISIS = phishing.RUTA_ANALISIS
 CORREO = {"subject": "Reunión", "body": "Hola, te confirmo la reunión del viernes a las diez en la sala tres."}
 
 
-def _sesion(uid: int) -> dict[str, str]:
+def _sesion(uid: UUID) -> dict[str, str]:
     jwt = create_access_token(subject=uid).access_token
     return {"Cookie": f"{settings.AUTH_COOKIE_NAME}={jwt}", "Origin": "http://testserver"}
 
@@ -26,7 +28,7 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _tokens(uid: int) -> list[models.TokenExtension]:
+def _tokens(uid: UUID) -> list[models.TokenExtension]:
     with SessionLocal() as db:
         return db.query(models.TokenExtension).filter_by(owner=uid).all()
 

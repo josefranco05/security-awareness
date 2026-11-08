@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
@@ -15,7 +17,7 @@ class UserCreate(UserBase):
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    uid: int
+    uid: UUID
     username: str
     nombre: str
     apellidos: str

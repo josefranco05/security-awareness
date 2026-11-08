@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from datetime import UTC, datetime
 from functools import partial
+from uuid import UUID
+
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 
 
 class CampañaBase(BaseModel):
@@ -12,9 +14,9 @@ class CampañaCreate(CampañaBase):
     remitente: EmailStr
     asunto: str
     cuerpo: str
-    destinatarios: list[int] = Field(default_factory=list)
+    destinatarios: list[UUID] = Field(default_factory=list)
 
 class CampañaResponse(CampañaBase):
     model_config = ConfigDict(from_attributes=True)
     
-    camid: int
+    camid: UUID

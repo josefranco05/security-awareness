@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 import jwt
 import pytest
@@ -18,13 +19,17 @@ URL_ME = "/api/usuarios/me"
 PASSWORD = "una-contraseña-bastante-larga"
 
 
-def _registrar(cliente, username="ana", password=PASSWORD) -> int:
+def _registrar(cliente, username="ana", password=PASSWORD) -> UUID:
     r = cliente.post("/api/usuarios", headers={"Origin": ORIGEN}, json={
         "username": username, "nombre": "Ana", "apellidos": "Pérez",
         "email": f"{username}@example.com", "password": password,
     })
     assert r.status_code == 201
-    return r.json()["uid"]
+    return UUID(r.json()["uid"])
+
+
+def _expirado() -> str:
+    return create_access_token(uuid4(), expires_delta=timedelta(seconds=-1)).access_token
 
 
 def _login(cliente, username, password):
@@ -47,16 +52,17 @@ def _exp(minutos: int = 5) -> datetime:
 # --- JWT --------------------------------------------------------------------------------
 
 def test_el_jwt_lleva_el_uid():
-    assert verify_access_token(create_access_token(subject=42).access_token) == "42"
+    uid = uuid4()
+    assert verify_access_token(create_access_token(subject=uid).access_token) == str(uid)
 
 
 @pytest.mark.parametrize("token", [
-    pytest.param(lambda: create_access_token(1, expires_delta=timedelta(seconds=-1)).access_token, id="expirado"),
-    pytest.param(lambda: _firmar({"sub": "1", "exp": _exp()}, clave="otra-clave-de-al-menos-32-bytes!!"), id="otra-clave"),
-    pytest.param(lambda: _firmar({"sub": "1", "exp": _exp()}, clave="", algoritmo="none"), id="alg-none"),
-    pytest.param(lambda: _firmar({"sub": "1"}), id="sin-exp"),
+    pytest.param(_expirado, id="expirado"),
+    pytest.param(lambda: _firmar({"sub": str(uuid4()), "exp": _exp()}, clave="otra-clave-de-al-menos-32-bytes!!"), id="otra-clave"),
+    pytest.param(lambda: _firmar({"sub": str(uuid4()), "exp": _exp()}, clave="", algoritmo="none"), id="alg-none"),
+    pytest.param(lambda: _firmar({"sub": str(uuid4())}), id="sin-exp"),
     pytest.param(lambda: _firmar({"exp": _exp()}), id="sin-sub"),
-    pytest.param(lambda: create_access_token(1).access_token[:-2] + "xx", id="firma-alterada"),
+    pytest.param(lambda: create_access_token(uuid4()).access_token[:-2] + "xx", id="firma-alterada"),
     pytest.param(lambda: "no-es-un-jwt", id="basura"),
 ])
 def test_jwt_invalido_no_da_uid(token):
@@ -119,8 +125,7 @@ def test_logout_borra_la_cookie(anonimo):
 
 
 def test_logout_funciona_con_la_sesion_expirada(anonimo):
-    expirado = create_access_token(1, expires_delta=timedelta(seconds=-1)).access_token
-    r = anonimo.post(URL_LOGOUT, headers={**_con_cookie(expirado), "Origin": ORIGEN})
+    r = anonimo.post(URL_LOGOUT, headers={**_con_cookie(_expirado()), "Origin": ORIGEN})
     assert r.status_code == 204 and _borra_la_cookie(r)
 
 
@@ -130,15 +135,23 @@ def test_me_devuelve_la_cuenta_propia(anonimo):
     uid, _ = crear_usuario("ana")
     r = anonimo.get(URL_ME, headers=sesion(uid))
     assert r.status_code == 200
-    assert r.json() == {"uid": uid, "username": "ana", "nombre": "a", "apellidos": "b", "email": "ana@example.com"}
+    assert r.json() == {"uid": str(uid), "username": "ana", "nombre": "a", "apellidos": "b", "email": "ana@example.com"}
+
+
+def test_un_sub_uuid_no_canonico_abre_la_misma_cuenta(anonimo):
+    uid, _ = crear_usuario()
+    token = _firmar({"sub": uid.hex.upper(), "exp": _exp()})
+    assert anonimo.get(URL_ME, headers=_con_cookie(token)).json()["uid"] == str(uid)
 
 
 @pytest.mark.parametrize("cabeceras", [
     pytest.param(lambda: {}, id="sin-cookie"),
     pytest.param(lambda: _con_cookie("basura"), id="basura"),
-    pytest.param(lambda: _con_cookie(create_access_token(1, expires_delta=timedelta(seconds=-1)).access_token), id="expirado"),
-    pytest.param(lambda: _con_cookie(create_access_token("abc").access_token), id="sub-no-numerico"),
-    pytest.param(lambda: {"Authorization": f"Bearer {create_access_token(1).access_token}"}, id="jwt-en-bearer"),
+    pytest.param(lambda: _con_cookie(_expirado()), id="expirado"),
+    pytest.param(lambda: _con_cookie(_firmar({"sub": "abc", "exp": _exp()})), id="sub-no-uuid"),
+    # Los JWT emitidos antes del cambio a UUID llevan el uid entero.
+    pytest.param(lambda: _con_cookie(_firmar({"sub": "1", "exp": _exp()})), id="sub-entero-antiguo"),
+    pytest.param(lambda: {"Authorization": f"Bearer {create_access_token(uuid4()).access_token}"}, id="jwt-en-bearer"),
 ])
 def test_sin_sesion_valida_la_api_da_401_y_la_pagina_redirige(anonimo, cabeceras):
     crear_usuario()

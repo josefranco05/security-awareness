@@ -57,7 +57,7 @@ async def crear_campaña(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
-    ee_ids = list(dict.fromkeys(u_id for u_id in campaña.destinatarios))
+    ee_ids = list(dict.fromkeys(campaña.destinatarios))
     if not ee_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,7 +108,7 @@ async def crear_campaña(
     # El encolado va DESPUÉS del commit: si el broker no responde, la campaña
     # queda creada con sus filas en "pending" y el barrido periódico las envía.
     try:
-        await run_in_threadpool(enviar_campaña.delay, nueva_campaña.camid)
+        await run_in_threadpool(enviar_campaña.delay, str(nueva_campaña.camid))
     except Exception:
         logger.exception(
             "No se pudo encolar el envío de la campaña %s", nueva_campaña.camid
@@ -144,7 +144,7 @@ async def enviar_campaña_ahora(
         )
 
     try:
-        await run_in_threadpool(enviar_campaña.delay, camid)
+        await run_in_threadpool(enviar_campaña.delay, str(camid))
     except Exception as exc:
         logger.exception("No se pudo encolar la campaña %s", camid)
         raise HTTPException(

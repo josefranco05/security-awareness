@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import OperationalError
@@ -19,7 +20,7 @@ def uid(anonimo) -> int:
     return crear_usuario()[0]
 
 
-def _campaña(owner, estados=("pending",), **extra) -> tuple[int, list[int]]:
+def _campaña(owner, estados=("pending",), **extra) -> tuple[UUID, list[UUID]]:
     with SessionLocal() as db:
         campaña = models.Campaña(owner=owner, nombre="c", remitente="r@example.com", asunto="a", cuerpo="c")
         db.add(campaña)
@@ -65,8 +66,9 @@ def _proveedor_que_falla(monkeypatch, error: Exception) -> list[str]:
 
 def test_envia_las_pendientes(uid, envios):
     camid, [a, b] = _campaña(uid, ["pending", "pending"])
-    assert tasks.enviar_campaña(camid) == {
-        "camid": camid, "enviados": 2, "fallidos": 0, "reintentables": 0, "omitidas": 0,
+    # Por la cola el id llega como texto.
+    assert tasks.enviar_campaña(str(camid)) == {
+        "camid": str(camid), "enviados": 2, "fallidos": 0, "reintentables": 0, "omitidas": 0,
     }
     for sim_id in (a, b):
         sim = _sim(sim_id)
@@ -189,13 +191,13 @@ def test_guardar_reintenta_si_la_base_esta_bloqueada(monkeypatch):
     esperas = []
     monkeypatch.setattr(tasks.time, "sleep", esperas.append)
     db = _BaseBloqueada(fallos=tasks.GUARDAR_INTENTOS - 1)
-    assert tasks._guardar(db, 1, status="sent") is True
+    assert tasks._guardar(db, uuid4(), status="sent") is True
     assert db.commits == 1 and esperas == list(range(1, tasks.GUARDAR_INTENTOS))
 
 
 def test_guardar_se_rinde_y_lo_deja_para_la_recuperacion(monkeypatch, caplog):
     monkeypatch.setattr(tasks.time, "sleep", lambda _: None)
-    assert tasks._guardar(_BaseBloqueada(fallos=99), 1, status="sent") is False
+    assert tasks._guardar(_BaseBloqueada(fallos=99), uuid4(), status="sent") is False
     assert "queda en 'sending'" in caplog.text
 
 
@@ -241,7 +243,8 @@ def test_barrido_encola_cada_campaña_con_pendientes_una_vez(uid, monkeypatch):
     otra, _ = _campaña(uid, ["pending"])
     _campaña(uid, ["sent", "failed"])
     assert tasks.barrer_pendientes() == 2
-    assert sorted(encoladas) == sorted([con_pendientes, otra])
+    # Se encola texto: un UUID no es serializable en JSON.
+    assert sorted(encoladas) == sorted([str(con_pendientes), str(otra)])
 
 
 def test_barrido_respeta_el_limite(uid, monkeypatch):

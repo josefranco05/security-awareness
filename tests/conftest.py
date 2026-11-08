@@ -1,13 +1,14 @@
 """Entorno de pruebas. Va antes de importar la app: core.config lee el entorno al importarse.
 
-Las variables reales prevalecen sobre el .env, así que la base temporal evita tocar
-database.db, que está versionada.
+Las variables reales prevalecen sobre el .env, así que las pruebas usan una base
+temporal y nunca tocan la base local de desarrollo.
 """
 from __future__ import annotations
 
 import os
 import tempfile
 from pathlib import Path
+from uuid import UUID
 
 _base = Path(tempfile.mkdtemp(prefix="sentinel-tests-")) / "test.db"
 
@@ -38,7 +39,7 @@ import models
 from routers import phishing
 
 
-def crear_usuario(username: str = "ana") -> tuple[int, str]:
+def crear_usuario(username: str = "ana") -> tuple[UUID, str]:
     """Crea un usuario con token de extensión y devuelve (uid, token)."""
     token, token_hash = nuevo_token_extension()
     with SessionLocal() as db:
@@ -55,7 +56,7 @@ def crear_usuario(username: str = "ana") -> tuple[int, str]:
 ORIGEN = "http://testserver"
 
 
-def sesion(uid: int) -> dict[str, str]:
+def sesion(uid: UUID) -> dict[str, str]:
     """Cabeceras de una petición del frontend con sesión iniciada."""
     jwt = create_access_token(subject=uid).access_token
     return {"Cookie": f"{settings.AUTH_COOKIE_NAME}={jwt}", "Origin": ORIGEN}

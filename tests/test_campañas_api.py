@@ -4,6 +4,8 @@ Los tests corren con Celery en modo eager y EMAIL_BACKEND=log: crear la campaña
 """
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 import pytest
 
 from database.worker_db import SessionLocal
@@ -20,7 +22,7 @@ def uid(anonimo) -> int:
     return crear_usuario("ana")[0]
 
 
-def _empleado(owner, email="e@example.com", estado=True) -> int:
+def _empleado(owner, email="e@example.com", estado=True) -> UUID:
     with SessionLocal() as db:
         empleado = models.Empleados(owner=owner, nombre="e", email=email, riesgo=50, empresa="x", estado=estado)
         db.add(empleado)
@@ -31,7 +33,7 @@ def _empleado(owner, email="e@example.com", estado=True) -> int:
 def _datos(destinatarios, **cambios):
     return {
         "nombre": "Mayo", "remitente": "rrhh@example.com", "asunto": "Bono", "cuerpo": "<p>Hola</p>",
-        "destinatarios": destinatarios, **cambios,
+        "destinatarios": [str(d) for d in destinatarios], **cambios,
     }
 
 
@@ -39,7 +41,11 @@ def _crear(cliente, uid, destinatarios, **cambios):
     return cliente.post(URL, headers=sesion(uid), json=_datos(destinatarios, **cambios))
 
 
-def _simulaciones(camid=None) -> list[models.Simulaciones]:
+def _camid(r) -> UUID:
+    return UUID(r.json()["camid"])
+
+
+def _simulaciones(camid: UUID | None = None) -> list[models.Simulaciones]:
     with SessionLocal() as db:
         consulta = db.query(models.Simulaciones)
         if camid is not None:
@@ -47,7 +53,7 @@ def _simulaciones(camid=None) -> list[models.Simulaciones]:
         return consulta.order_by(models.Simulaciones.id).all()
 
 
-def _campaña_pendiente(owner, n=1) -> int:
+def _campaña_pendiente(owner, n=1) -> UUID:
     """Campaña con `n` simulaciones en pending, creada sin pasar por la API (no se envía)."""
     with SessionLocal() as db:
         campaña = models.Campaña(owner=owner, nombre="Pendiente", remitente="r@example.com", asunto="a", cuerpo="c")
@@ -63,9 +69,9 @@ def _campaña_pendiente(owner, n=1) -> int:
 
 
 @pytest.fixture
-def encolados(monkeypatch) -> list[int]:
-    """Sustituye el encolado: registra el camid en vez de enviar."""
-    llamadas: list[int] = []
+def encolados(monkeypatch) -> list[str]:
+    """Sustituye el encolado: registra el camid (como viaja por la cola: texto) en vez de enviar."""
+    llamadas: list[str] = []
     monkeypatch.setattr(tasks.enviar_campaña, "delay", llamadas.append)
     return llamadas
 
@@ -84,7 +90,7 @@ def test_crear_campaña_crea_una_simulacion_por_destinatario_y_la_envia(anonimo,
     a, b = _empleado(uid, "a@example.com"), _empleado(uid, "b@example.com")
     r = _crear(anonimo, uid, [a, b])
     assert r.status_code == 201
-    camid = r.json()["camid"]
+    camid = _camid(r)
     assert set(r.json()) == {"camid", "nombre", "fecha"}
     sims = _simulaciones(camid)
     assert sorted(s.ee_id for s in sims) == sorted([a, b])
@@ -95,9 +101,9 @@ def test_crear_campaña_crea_una_simulacion_por_destinatario_y_la_envia(anonimo,
 
 def test_destinatarios_repetidos_cuentan_una_vez(anonimo, uid, encolados):
     a = _empleado(uid)
-    camid = _crear(anonimo, uid, [a, a, a]).json()["camid"]
+    camid = _camid(_crear(anonimo, uid, [a, a, a]))
     assert len(_simulaciones(camid)) == 1
-    assert encolados == [camid]
+    assert encolados == [str(camid)]
 
 
 def test_sin_destinatarios_da_400(anonimo, uid):
@@ -113,7 +119,7 @@ def test_destinatario_no_valido_da_400_y_no_crea_nada(anonimo, uid, caso):
     malo = {
         "ajeno": lambda: _empleado(otro, "ajeno@example.com"),
         "inactivo": lambda: _empleado(uid, "inactivo@example.com", estado=False),
-        "inexistente": lambda: 999999,
+        "inexistente": uuid4,
     }[caso]()
     assert _crear(anonimo, uid, [propio, malo]).status_code == 400
     with SessionLocal() as db:
@@ -126,10 +132,16 @@ def test_crear_valida_los_campos(anonimo, uid, cambios):
     assert _crear(anonimo, uid, [_empleado(uid)], **cambios).status_code == 422
 
 
+@pytest.mark.parametrize("destinatarios", [[1], ["abc"], [None]])
+def test_destinatarios_que_no_son_uuid_dan_422(anonimo, uid, destinatarios):
+    r = anonimo.post(URL, headers=sesion(uid), json={**_datos([]), "destinatarios": destinatarios})
+    assert r.status_code == 422
+
+
 def test_con_el_broker_caido_la_campaña_se_crea_igual(anonimo, uid, broker_caido, caplog):
     r = _crear(anonimo, uid, [_empleado(uid)])
     assert r.status_code == 201
-    [sim] = _simulaciones(r.json()["camid"])
+    [sim] = _simulaciones(_camid(r))
     assert sim.status == "pending"  # el barrido la enviará
     assert "No se pudo encolar" in caplog.text
 
@@ -145,12 +157,12 @@ def test_enviar_encola_las_pendientes(anonimo, uid, encolados):
     camid = _campaña_pendiente(uid, n=2)
     r = anonimo.post(f"{URL}/{camid}/enviar", headers=sesion(uid))
     assert r.status_code == 200
-    assert r.json() == {"camid": camid, "pendientes": 2, "encolado": True}
-    assert encolados == [camid]
+    assert r.json() == {"camid": str(camid), "pendientes": 2, "encolado": True}
+    assert encolados == [str(camid)]
 
 
 def test_enviar_sin_pendientes_da_409(anonimo, uid, encolados):
-    camid = _crear(anonimo, uid, [_empleado(uid)]).json()["camid"]
+    camid = _camid(_crear(anonimo, uid, [_empleado(uid)]))
     encolados.clear()
     with SessionLocal() as db:
         db.query(models.Simulaciones).update({"status": "sent"})
@@ -193,7 +205,7 @@ def test_la_campaña_de_otro_da_404(anonimo, uid, encolados, metodo, ruta):
 
 def test_borrar_la_campaña_borra_sus_simulaciones_pero_no_los_empleados(anonimo, uid):
     eeid = _empleado(uid)
-    camid = _crear(anonimo, uid, [eeid]).json()["camid"]
+    camid = _camid(_crear(anonimo, uid, [eeid]))
     assert anonimo.delete(f"{URL}/{camid}", headers=sesion(uid)).status_code == 204
     assert _simulaciones() == []
     with SessionLocal() as db:
@@ -209,7 +221,7 @@ def test_listar_simulaciones_solo_las_de_mis_campañas(anonimo, uid):
     propia = _campaña_pendiente(uid, n=3)
     r = anonimo.get(URL_SIMULACIONES, headers=sesion(uid))
     assert r.status_code == 200
-    assert len(r.json()) == 3 and {s["campana_id"] for s in r.json()} == {propia}
+    assert len(r.json()) == 3 and {s["campana_id"] for s in r.json()} == {str(propia)}
 
 
 def test_simulaciones_de_una_campaña(anonimo, uid):
@@ -217,7 +229,7 @@ def test_simulaciones_de_una_campaña(anonimo, uid):
     _campaña_pendiente(uid, n=1)
     r = anonimo.get(f"{URL_SIMULACIONES}/{camid}", headers=sesion(uid))
     assert r.status_code == 200
-    assert [s["campana_id"] for s in r.json()] == [camid, camid]
+    assert [s["campana_id"] for s in r.json()] == [str(camid)] * 2
     assert all(s["status"] == "pending" and s["fecha_envio"] is None for s in r.json())
 
 

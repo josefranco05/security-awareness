@@ -28,9 +28,9 @@ ENV/
 # ---------------------------------------------------------------------------
 # SQLite
 # ---------------------------------------------------------------------------
-# database.db se mantiene rastreado a propósito: son los datos de demostración
-# que necesita el despliegue. Solo se ignoran los archivos auxiliares del
-# modo WAL, que cambian en cada ejecución.
+# Base local de desarrollo: se crea al arrancar y no se versiona.
+# Los datos de demostración saldrán de un script de seed.
+*.db
 *.db-wal
 *.db-shm
 *.db-journal

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import UTC, datetime, time, timedelta
+from uuid import UUID
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,7 +41,7 @@ def _ahora() -> datetime:
     return datetime.now(UTC)
 
 
-async def _campañas_activas(db: AsyncSession, uid: int, ahora: datetime) -> int:
+async def _campañas_activas(db: AsyncSession, uid: UUID, ahora: datetime) -> int:
     """Una campaña sigue activa hasta que termina su última simulación."""
     limite_prueba = ahora - timedelta(days=DIAS_COMPLETADA_PRUEBA)
     total = await db.scalar(
@@ -59,7 +60,7 @@ async def _campañas_activas(db: AsyncSession, uid: int, ahora: datetime) -> int
     return total or 0
 
 
-async def _tasa_entrega(db: AsyncSession, uid: int) -> int | None:
+async def _tasa_entrega(db: AsyncSession, uid: UUID) -> int | None:
     """Porcentaje de entregados entre los que ya tienen resultado; None si aún no hay ninguno."""
     filas = await db.execute(
         select(models.Simulaciones.status, func.count())
@@ -73,7 +74,7 @@ async def _tasa_entrega(db: AsyncSession, uid: int) -> int | None:
     return round(entregados * 100 / con_resultado) if con_resultado else None
 
 
-async def _detecciones_por_dia(db: AsyncSession, uid: int, ahora: datetime) -> dict:
+async def _detecciones_por_dia(db: AsyncSession, uid: UUID, ahora: datetime) -> dict:
     hoy = fecha_local(ahora).date()
     dias = [hoy - timedelta(days=n) for n in range(DIAS_GRAFICA - 1, -1, -1)]
     inicio = datetime.combine(dias[0], time.min, ZONA_COLOMBIA).astimezone(UTC)
@@ -93,10 +94,11 @@ async def _detecciones_por_dia(db: AsyncSession, uid: int, ahora: datetime) -> d
     }
 
 
-async def _resultados_campañas(db: AsyncSession, uid: int) -> dict:
+async def _resultados_campañas(db: AsyncSession, uid: UUID) -> dict:
     campañas = (await db.execute(
         select(models.Campaña.camid, models.Campaña.nombre)
         .where(models.Campaña.owner == uid)
+        # El id solo desempata para que el orden sea estable: un UUID4 no indica cuál es más nuevo.
         .order_by(models.Campaña.fecha.desc(), models.Campaña.camid.desc())
         .limit(MAX_CAMPAÑAS_GRAFICA)
     )).all()
@@ -107,7 +109,7 @@ async def _resultados_campañas(db: AsyncSession, uid: int) -> dict:
     )
     conteo = {(camid, estado): total for camid, estado, total in filas.all()}
 
-    def sumar(camid: int, estados: tuple[str, ...]) -> int:
+    def sumar(camid: UUID, estados: tuple[str, ...]) -> int:
         return sum(conteo.get((camid, e), 0) for e in estados)
 
     return {
@@ -122,7 +124,7 @@ def _señal_principal(reglas: list[str]) -> str:
     return next((nombre for regla, nombre in SEÑALES if regla in reglas), SIN_SEÑAL)
 
 
-async def _alertas(db: AsyncSession, uid: int) -> list[dict]:
+async def _alertas(db: AsyncSession, uid: UUID) -> list[dict]:
     recientes = await db.scalars(
         select(models.Deteccion)
         .where(models.Deteccion.owner == uid, models.Deteccion.nivel.in_(NIVELES_AMENAZA))
@@ -140,7 +142,7 @@ async def _alertas(db: AsyncSession, uid: int) -> list[dict]:
     ]
 
 
-async def resumen_dashboard(db: AsyncSession, uid: int) -> dict:
+async def resumen_dashboard(db: AsyncSession, uid: UUID) -> dict:
     ahora = _ahora()
     empleados = await db.scalar(
         select(func.count()).select_from(models.Empleados).where(models.Empleados.owner == uid)

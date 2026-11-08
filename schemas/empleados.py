@@ -1,5 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
 from typing import Annotated
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
 class EmpleadoBase(BaseModel):
@@ -25,4 +27,4 @@ class EmpleadoUpdate(BaseModel):
 class EmpleadoResponse(EmpleadoBase):
     model_config = ConfigDict(from_attributes=True)
 
-    eeid: int
+    eeid: UUID

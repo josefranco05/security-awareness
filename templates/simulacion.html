@@ -855,7 +855,7 @@
                 destinatarios: boxes().filter(function (box) {
                     return box.checked;
                 }).map(function (box) {
-                    return Number(box.value);
+                    return box.value;
                 })
             };
 
@@ -878,7 +878,7 @@
                 }
 
                 document.getElementById("campaignSuccessMessage").textContent =
-                    "La campaña se creó correctamente" + (result.camid ? " (ID " + result.camid + ")." : ".");
+                    "La campaña se creó correctamente.";
                 showModal("campaignSuccessModal");
                 btnCreate.textContent = "Campaña creada";
                 window.setTimeout(function () {

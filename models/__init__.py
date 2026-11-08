@@ -1,17 +1,27 @@
+"""Modelos. Todas las claves primarias son UUID4 generados en Python.
+
+Se generan en la aplicación (no en la base) para conocer el id antes del flush y
+comportarse igual en SQLite (CHAR(32)) y en PostgreSQL (uuid nativo).
+"""
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, UTC
 
-from sqlalchemy import DateTime, Float, JSON, String, Integer, ForeignKey, Text, Boolean, UniqueConstraint
+from sqlalchemy import DateTime, Float, JSON, String, Integer, ForeignKey, Text, Boolean, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.async_database import Base
 
 
+def _pk() -> Mapped[uuid.UUID]:
+    return mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+
+
 class User(Base):
     __tablename__ = "users"
 
-    uid: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    uid: Mapped[uuid.UUID] = _pk()
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -30,8 +40,8 @@ class User(Base):
 class Campaña(Base):
     __tablename__ = "campanas"
 
-    camid: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
+    camid: Mapped[uuid.UUID] = _pk()
+    owner: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     remitente: Mapped[str] = mapped_column(String, nullable=False)
@@ -47,8 +57,8 @@ class Empleados(Base):
     # El email es único por dueño, no global: evita revelar empleados de otros usuarios.
     __table_args__ = (UniqueConstraint("owner", "email"),)
 
-    eeid: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
+    eeid: Mapped[uuid.UUID] = _pk()
+    owner: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(50), nullable=False)
     riesgo: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -63,9 +73,9 @@ class Empleados(Base):
 class Simulaciones(Base):
     __tablename__ = "simulaciones"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    campana_id: Mapped[int] = mapped_column(ForeignKey("campanas.camid"), nullable=False, index=True)
-    ee_id: Mapped[int] = mapped_column(ForeignKey("empleados.eeid"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = _pk()
+    campana_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campanas.camid"), nullable=False, index=True)
+    ee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empleados.eeid"), nullable=False, index=True)
     # Se marca cuando el correo se envía, no cuando se crea la fila.
     fecha_envio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fecha_respuesta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
@@ -87,8 +97,8 @@ class Deteccion(Base):
 
     __tablename__ = "detecciones"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = _pk()
+    owner: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.uid"), nullable=False, index=True)
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     etiqueta: Mapped[str] = mapped_column(String(20), nullable=False)
     # Nivel final, después de las reglas. Es el que se muestra.
@@ -107,8 +117,8 @@ class TokenExtension(Base):
 
     __tablename__ = "tokens_extension"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    owner: Mapped[int] = mapped_column(ForeignKey("users.uid"), nullable=False, unique=True)
+    id: Mapped[uuid.UUID] = _pk()
+    owner: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.uid"), nullable=False, unique=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     creado: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 

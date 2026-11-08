@@ -5,7 +5,7 @@ import math
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -23,9 +23,9 @@ class LimiteVentana:
         self._ventana_s = ventana_s
         self._reloj = reloj
         self._lock = threading.Lock()
-        self._marcas: dict[int, deque[float]] = {}
+        self._marcas: dict[Hashable, deque[float]] = {}
 
-    def comprobar(self, clave: int, maximo: int) -> int:
+    def comprobar(self, clave: Hashable, maximo: int) -> int:
         with self._lock:
             ahora = self._reloj()
             self._purgar(ahora)

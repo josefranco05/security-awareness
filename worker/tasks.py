@@ -11,6 +11,8 @@ proveedor aceptó el correo: `recuperar_colgadas` devuelve la fila a `pending`
 y se reenvía. Para ese caso, el reclamo asigna un `proveedor_id` (Operation-Id
 de ACS) que se conserva entre intentos; el reenvío usa el mismo id y ACS no
 crea un segundo correo.
+
+Los ids viajan por la cola como texto (JSON): las tareas reciben `str` y lo convierten a UUID.
 """
 from __future__ import annotations
 
@@ -45,7 +47,7 @@ def tarea(**opciones: Any) -> Callable[[Callable[..., Any]], Task]:
     return cast(Callable[[Callable[..., Any]], Task], celery_app.task(**opciones))
 
 
-def _reclamar(db, sim_id: int) -> bool:
+def _reclamar(db, sim_id: uuid.UUID) -> bool:
     """Marca la fila como `sending` solo si seguía en `pending`.
 
     En el primer reclamo fija el `proveedor_id`; los siguientes lo conservan.
@@ -71,7 +73,7 @@ def _reclamar(db, sim_id: int) -> bool:
     return resultado.rowcount == 1
 
 
-def _guardar(db, sim_id: int, **valores) -> bool:
+def _guardar(db, sim_id: uuid.UUID, **valores) -> bool:
     """Guarda el resultado del envío si la fila sigue en `sending`.
 
     Si no se logra, la fila queda en `sending` con su `proveedor_id`:
@@ -106,14 +108,16 @@ def _guardar(db, sim_id: int, **valores) -> bool:
 
 
 @tarea(name="tasks.enviar_campaña", ignore_result=True)
-def enviar_campaña(camid: int) -> dict:
+def enviar_campaña(camid: str) -> dict:
+    camid = str(camid)
+    campana_id = uuid.UUID(camid)
     enviados = fallidos = reintentables = omitidas = 0
 
     with SessionLocal() as db:
         filas = db.scalars(
             select(models.Simulaciones)
             .where(
-                models.Simulaciones.campana_id == camid,
+                models.Simulaciones.campana_id == campana_id,
                 models.Simulaciones.status == "pending",
             )
             .order_by(models.Simulaciones.id)
@@ -187,7 +191,7 @@ def barrer_pendientes(limite: int = 50) -> int:
         ).all()
 
     for camid in camids:
-        enviar_campaña.delay(camid)
+        enviar_campaña.delay(str(camid))
 
     if camids:
         logger.info("barrido: %s campañas encoladas", len(camids))

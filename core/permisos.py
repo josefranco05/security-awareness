@@ -10,11 +10,12 @@ dependencia del recurso, p. ej.:
     async def eliminar(campaña: CampañaPropia): ...
 
 Si el recurso no existe o es de otro usuario se responde 404 en ambos casos,
-para no revelar qué ids existen.
+para no revelar qué ids existen. Un id que no es UUID lo rechaza la validación (422).
 """
 from __future__ import annotations
 
 from typing import Annotated, Any, ClassVar, Protocol, TypeVar
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
@@ -29,7 +30,7 @@ from database.async_database import get_db
 class ConPropietario(Protocol):
     """Cualquier modelo mapeado con columna `owner` (FK a users.uid)."""
     __mapper__: ClassVar[Mapper[Any]]
-    owner: Mapped[int]
+    owner: Mapped[UUID]
 
 
 Modelo = TypeVar("Modelo", bound=ConPropietario)
@@ -38,7 +39,7 @@ Modelo = TypeVar("Modelo", bound=ConPropietario)
 async def validar_propietario(
     db: AsyncSession,
     modelo: type[Modelo],
-    id_recurso: int,
+    id_recurso: UUID,
     current_user: models.User,
 ) -> Modelo:
     """Devuelve el recurso si existe y pertenece al usuario; si no, 404."""
@@ -53,7 +54,7 @@ async def validar_propietario(
 
 # CAMPAÑAS
 async def get_campaña_propia(
-    camid: int,
+    camid: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> models.Campaña:
@@ -65,7 +66,7 @@ CampañaPropia = Annotated[models.Campaña, Depends(get_campaña_propia)]
 
 # EMPLEADOS
 async def get_empleado_propio(
-    eeid: int,
+    eeid: UUID,
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> models.Empleados:
@@ -76,7 +77,7 @@ EmpleadoPropio = Annotated[models.Empleados, Depends(get_empleado_propio)]
 
 
 # USUARIOS
-async def get_usuario_propio(uid: int, current_user: CurrentUser) -> models.User:
+async def get_usuario_propio(uid: UUID, current_user: CurrentUser) -> models.User:
     """Un usuario solo puede leer o modificar su propia cuenta."""
     if current_user.uid != uid:
         raise _no_encontrado

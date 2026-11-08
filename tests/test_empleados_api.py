@@ -1,6 +1,8 @@
 """CRUD de empleados: solo los propios, email único por dueño."""
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 import pytest
 
 from database.worker_db import SessionLocal
@@ -20,9 +22,10 @@ def _crear(cliente, uid, **cambios):
     return cliente.post(URL, headers=sesion(uid), json={**EMPLEADO, **cambios})
 
 
-def _en_base(eeid) -> models.Empleados | None:
+def _en_base(eeid: str | UUID) -> models.Empleados | None:
+    """Acepta el id tal como lo devuelve la API (texto)."""
     with SessionLocal() as db:
-        return db.get(models.Empleados, eeid)
+        return db.get(models.Empleados, UUID(str(eeid)))
 
 
 # --- crear ------------------------------------------------------------------------------
@@ -38,7 +41,7 @@ def test_crear_empleado(anonimo, uid):
 
 def test_el_dueño_sale_de_la_sesion_no_del_cuerpo(anonimo, uid):
     otro, _ = crear_usuario("beto")
-    r = _crear(anonimo, uid, owner=otro)
+    r = _crear(anonimo, uid, owner=str(otro))
     assert _en_base(r.json()["eeid"]).owner == uid
 
 
@@ -105,7 +108,11 @@ def test_el_empleado_de_otro_da_404(anonimo, uid, metodo, cuerpo):
 
 
 def test_un_id_inexistente_da_404(anonimo, uid):
-    assert anonimo.get(f"{URL}/999999", headers=sesion(uid)).status_code == 404
+    assert anonimo.get(f"{URL}/{uuid4()}", headers=sesion(uid)).status_code == 404
+
+
+def test_un_id_que_no_es_uuid_da_422(anonimo, uid):
+    assert anonimo.get(f"{URL}/1", headers=sesion(uid)).status_code == 422
 
 
 # --- reemplazar (PUT) -------------------------------------------------------------------
@@ -157,7 +164,7 @@ def test_editar_al_email_de_otro_empleado_da_400(anonimo, uid):
 def test_editar_no_cambia_el_dueño(anonimo, uid):
     otro, _ = crear_usuario("beto")
     eeid = _crear(anonimo, uid).json()["eeid"]
-    anonimo.patch(f"{URL}/{eeid}", headers=sesion(uid), json={"owner": otro, "nombre": "X"})
+    anonimo.patch(f"{URL}/{eeid}", headers=sesion(uid), json={"owner": str(otro), "nombre": "X"})
     assert _en_base(eeid).owner == uid
 
 
@@ -169,7 +176,7 @@ def test_borrar_el_empleado_borra_sus_simulaciones(anonimo, uid):
         campaña = models.Campaña(owner=uid, nombre="c", remitente="r@example.com", asunto="a", cuerpo="c")
         db.add(campaña)
         db.flush()
-        db.add(models.Simulaciones(campana_id=campaña.camid, ee_id=eeid))
+        db.add(models.Simulaciones(campana_id=campaña.camid, ee_id=UUID(eeid)))
         db.commit()
     assert anonimo.delete(f"{URL}/{eeid}", headers=sesion(uid)).status_code == 204
     assert _en_base(eeid) is None

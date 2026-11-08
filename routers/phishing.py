@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -32,7 +33,7 @@ MAX_BYTES_PETICION = 512_000
 limite_analisis = LimiteVentana()
 
 
-def limitar_peticiones(uid: Annotated[int, Depends(require_extension_token)]) -> int:
+def limitar_peticiones(uid: Annotated[UUID, Depends(require_extension_token)]) -> UUID:
     espera = limite_analisis.comprobar(uid, settings.ANALISIS_POR_MINUTO)
     if espera:
         logger.warning("análisis rechazado: uid=%s motivo=limite espera_s=%s", uid, espera)
@@ -44,7 +45,7 @@ def limitar_peticiones(uid: Annotated[int, Depends(require_extension_token)]) ->
     return uid
 
 
-def _guardar_deteccion(uid: int, resultado) -> None:
+def _guardar_deteccion(uid: UUID, resultado) -> None:
     """Un fallo aquí no le quita el resultado al usuario: se registra y se sigue."""
     try:
         with SessionLocal() as db:
@@ -68,7 +69,7 @@ router = APIRouter()
 def analizar_correo(
     datos: AnalisisRequest,
     request: Request,
-    uid: Annotated[int, Depends(limitar_peticiones)],
+    uid: Annotated[UUID, Depends(limitar_peticiones)],
 ):
     bytes_cuerpo = len(datos.body.encode("utf-8"))
     if bytes_cuerpo > MAX_BYTES_CUERPO:

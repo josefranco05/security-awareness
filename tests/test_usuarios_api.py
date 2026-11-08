@@ -1,6 +1,8 @@
 """Registro y CRUD de la cuenta propia."""
 from __future__ import annotations
 
+from uuid import UUID, uuid4
+
 import pytest
 
 from core.config import settings
@@ -34,6 +36,7 @@ def test_registro_crea_la_cuenta(anonimo):
     assert datos["email"] == "carla@example.com"
     [usuario] = _usuarios()
     assert usuario.email == "carla@example.com"
+    assert UUID(datos["uid"]) == usuario.uid and usuario.uid.version == 4
 
 
 @pytest.mark.parametrize("cambios", [
@@ -75,7 +78,7 @@ def test_leer_la_cuenta_propia_no_muestra_el_email(anonimo):
     uid, _ = crear_usuario("ana")
     r = anonimo.get(f"{URL}/{uid}", headers=sesion(uid))
     assert r.status_code == 200
-    assert r.json() == {"uid": uid, "username": "ana", "nombre": "a", "apellidos": "b"}
+    assert r.json() == {"uid": str(uid), "username": "ana", "nombre": "a", "apellidos": "b"}
 
 
 @pytest.mark.parametrize("metodo, cuerpo", [("get", None), ("patch", {"nombre": "x"}), ("delete", None)])
@@ -91,7 +94,13 @@ def test_la_cuenta_de_otro_da_404(anonimo, metodo, cuerpo):
 
 def test_un_id_inexistente_tambien_da_404(anonimo):
     uid, _ = crear_usuario()
-    assert anonimo.get(f"{URL}/{uid + 999}", headers=sesion(uid)).status_code == 404
+    assert anonimo.get(f"{URL}/{uuid4()}", headers=sesion(uid)).status_code == 404
+
+
+@pytest.mark.parametrize("id_malo", ["1", "abc", "00000000-0000-0000-0000-00000000000g"])
+def test_un_id_que_no_es_uuid_da_422(anonimo, id_malo):
+    uid, _ = crear_usuario()
+    assert anonimo.get(f"{URL}/{id_malo}", headers=sesion(uid)).status_code == 422
 
 
 @pytest.mark.parametrize("metodo", ["get", "patch", "delete"])
@@ -108,7 +117,7 @@ def test_actualizar_cambia_solo_lo_enviado(anonimo):
     r = anonimo.patch(f"{URL}/{uid}", headers=sesion(uid), json={"nombre": "Ana María", "email": "NUEVO@example.com"})
     assert r.status_code == 200
     assert r.json() == {
-        "uid": uid, "username": "ana", "nombre": "Ana María", "apellidos": "b", "email": "nuevo@example.com",
+        "uid": str(uid), "username": "ana", "nombre": "Ana María", "apellidos": "b", "email": "nuevo@example.com",
     }
 
 
@@ -136,6 +145,27 @@ def test_actualizar_no_cambia_la_contraseña(anonimo):
     assert r.status_code == 200
     with SessionLocal() as db:
         assert db.get(models.User, uid).password_hash == "x"
+
+
+# --- páginas ----------------------------------------------------------------------------
+
+def test_la_pagina_de_cuenta_usa_el_uuid_en_su_api(anonimo):
+    # tojson no serializa un UUID: sin `| string` la página daría 500.
+    uid, _ = crear_usuario()
+    r = anonimo.get("/cuenta", headers=sesion(uid))
+    assert r.status_code == 200
+    assert f'"/api/usuarios/" + "{uid}"' in r.text
+
+
+def test_la_pagina_de_simulacion_envia_los_uuid_tal_cual(anonimo):
+    uid, _ = crear_usuario()
+    with SessionLocal() as db:
+        empleado = models.Empleados(owner=uid, nombre="e", email="e@example.com", riesgo=0, empresa="x")
+        db.add(empleado)
+        db.commit()
+    html = anonimo.get("/simulacion", headers=sesion(uid)).text
+    assert f'name="destinatarios" value="{empleado.eeid}"' in html
+    assert "Number(box.value)" not in html
 
 
 # --- borrar -----------------------------------------------------------------------------

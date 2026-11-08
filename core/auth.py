@@ -18,6 +18,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException, Request, Response, status
@@ -67,7 +68,7 @@ async def autenticar_usuario(
 
 
 def create_access_token(
-    subject: str | int, expires_delta: timedelta | None = None
+    subject: UUID, expires_delta: timedelta | None = None
 ) -> Token:
     """Firma un JWT cuyo `sub` es el identificador del usuario (su uid)."""
     if expires_delta is None:
@@ -133,7 +134,8 @@ async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> models.User:
     try:
-        uid = int(verify_access_token(token))
+        # Un `sub` vacío (token inválido) o que no sea un UUID da ValueError.
+        uid = UUID(verify_access_token(token))
     except (jwt.InvalidTokenError, ValueError, TypeError):
         raise _token_expired
 
@@ -187,7 +189,7 @@ def nuevo_token_extension() -> tuple[str, str]:
 
 def require_extension_token(
     credenciales: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
-) -> int:
+) -> UUID:
     """Devuelve el uid dueño del token. Es síncrona porque corre junto a un endpoint `def`.
 
     La cookie de sesión no sirve aquí: esta ruta no exige Origin, así que aceptarla abriría CSRF.
