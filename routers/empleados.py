@@ -90,7 +90,7 @@ async def remplazar_empleado(
     empleado_a_cambiar.nombre = empleado.nombre
     empleado_a_cambiar.email = empleado.email
     empleado_a_cambiar.empresa = empleado.empresa
-    empleado_a_cambiar.cargo = str(empleado.cargo)
+    empleado_a_cambiar.cargo = empleado.cargo #type: ignore
     empleado_a_cambiar.riesgo = empleado.riesgo
     empleado_a_cambiar.estado = empleado.estado
 

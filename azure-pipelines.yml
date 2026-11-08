@@ -34,6 +34,18 @@ stages:
       workingDirectory: $(projectRoot)
       displayName: "Install dependencies (uv)"
 
+    # Si falla una prueba no se despliega. tests/conftest.py fija su propio entorno y base temporal.
+    # uv run instala el grupo dev (pytest) solo aquí; el .venv se borra antes de empaquetar.
+    - script: |
+        uv run --frozen pytest -q
+      workingDirectory: $(projectRoot)
+      displayName: "Run tests (pytest)"
+
+    - script: |
+        node --test "extension/tests/*.test.js"
+      workingDirectory: $(projectRoot)
+      displayName: "Run extension tests (node)"
+
     - script: |
         # Valores ficticios solo para el import; los reales están en las App Settings.
         # Van en línea y no en env: para que ninguna variable del pipeline los pise.

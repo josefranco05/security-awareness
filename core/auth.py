@@ -176,8 +176,6 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def hash_token_extension(token: str) -> str:
-    # SHA-256 y no Argon2: el token son 256 bits aleatorios, no una contraseña que
-    # se pueda adivinar. Además permite buscarlo por su hash en cada análisis.
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
