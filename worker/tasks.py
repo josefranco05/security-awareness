@@ -37,7 +37,7 @@ from database.worker_db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
-# Reintentos del UPDATE posterior al envío (p. ej. SQLite bloqueado).
+# Reintentos del UPDATE posterior al envío (p. ej. conexión cortada o failover de la base).
 GUARDAR_INTENTOS = 3
 
 

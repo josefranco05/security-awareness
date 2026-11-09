@@ -37,8 +37,8 @@ from sqlalchemy.orm import selectinload
 import logging
 
 import models
-from database.async_database import Base, engine, get_db
-from routers import campañas as campañas_router, empleados, phishing, simulaciones, webhooks, usuarios
+from database.async_database import engine, get_db
+from routers import campañas as campañas_router, empleados, phishing, salud, simulaciones, webhooks, usuarios
 from core.auth import get_current_user, CurrentUser, OptionalUser
 from core.config import settings
 from core.fechas import fecha_local
@@ -68,9 +68,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Startup. El esquema no se crea aquí: lo aplican las migraciones (alembic upgrade head).
     # Sin modelo válido la app no arranca: un pickle incompatible predeciría mal sin avisar.
     _app.state.modelo_phishing = cargar_modelo()
     yield
@@ -118,6 +116,7 @@ app.include_router(campañas_router.router, prefix="/api/campañas", tags=["camp
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 app.include_router(phishing.router, prefix="/api/phishing", tags=["phishing"])
+app.include_router(salud.router)
 
 
 # Flash messages, exponen get_flashed_messages() dentro de los templates

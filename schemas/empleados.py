@@ -5,10 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
 class EmpleadoBase(BaseModel):
-    nombre: str
+    nombre: str = Field(max_length=100)
     email: EmailStr
-    empresa: str = Field(min_length=1)
-    cargo: str | None
+    empresa: str = Field(min_length=1, max_length=100)
+    cargo: str | None = Field(max_length=50)
 
 
 class EmpleadoCreate(EmpleadoBase):
@@ -17,10 +17,10 @@ class EmpleadoCreate(EmpleadoBase):
 
 
 class EmpleadoUpdate(BaseModel):
-    nombre: str | None = None
+    nombre: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
-    empresa: str | None = Field(default=None, min_length=1)
-    cargo: str | None = None
+    empresa: str | None = Field(default=None, min_length=1, max_length=100)
+    cargo: str | None = Field(default=None, max_length=50)
     estado: bool | None = None
 
 

@@ -1,0 +1,99 @@
+# Desarrollo local. Las credenciales son solo para desarrollo; en Azure salen de Key Vault.
+#
+#   docker compose up -d                       PostgreSQL y Redis; la app con uv run
+#   docker compose --profile app up --build    todo en contenedores, como en producción:
+#                                              migraciones, web, worker y beat (http://127.0.0.1:8000)
+name: sentinel
+
+# Configuración común de los contenedores de la app. Los secretos salen de .env;
+# lo de `environment` lo pisa para apuntar a los servicios de este archivo.
+x-app: &app
+  build: .
+  image: sentinel:dev
+  profiles: [app]
+  env_file: .env
+  environment: &app-env
+    DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@postgres:5432/sentinel
+    WORKER_DATABASE_URL: postgresql+psycopg://sentinel:sentinel@postgres:5432/sentinel
+    CELERY_BROKER_URL: redis://redis:6379/0
+    # Cola real, como en producción: el envío lo hace el worker, no la web.
+    CELERY_TASK_ALWAYS_EAGER: "false"
+    # Nunca se envían correos reales desde local, aunque .env diga acs.
+    EMAIL_BACKEND: log
+    AUTH_COOKIE_SECURE: "false"
+    ALLOWED_ORIGINS: '["http://127.0.0.1:8000","http://localhost:8000"]'
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # Una sola vez antes de la web: como el Job de migraciones en Container Apps.
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  web:
+    <<: *app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  worker:
+    <<: *app
+    command: ["celery", "-A", "worker.celery_app.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Exactamente uno: dos beats programarían cada barrido dos veces.
+  beat:
+    <<: *app
+    command: ["celery", "-A", "worker.celery_app.celery_app", "beat", "--loglevel=info", "--schedule", "/tmp/celerybeat-schedule"]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel
+      POSTGRES_DB: sentinel
+    # 5433 en el host: no choca con un PostgreSQL instalado localmente en 5432.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

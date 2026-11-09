@@ -61,6 +61,10 @@ def test_otro_dueño_puede_usar_el_mismo_email(anonimo, uid):
     {"riesgo": 101},
     {"email": "no-es-email"},
     {"empresa": ""},
+    # Más largo que la columna: PostgreSQL lo rechazaría con un 500.
+    {"nombre": "a" * 101},
+    {"empresa": "a" * 101},
+    {"cargo": "a" * 51},
 ])
 def test_crear_valida_los_campos(anonimo, uid, cambios):
     assert _crear(anonimo, uid, **cambios).status_code == 422
@@ -148,6 +152,12 @@ def test_editar_cambia_solo_lo_enviado(anonimo, uid):
     assert r.status_code == 200
     fila = _en_base(eeid)
     assert fila.estado is False and fila.riesgo == 40 and fila.nombre == "Luis"
+
+
+@pytest.mark.parametrize("cambios", [{"nombre": "a" * 101}, {"empresa": "a" * 101}, {"cargo": "a" * 51}])
+def test_editar_valida_el_largo(anonimo, uid, cambios):
+    eeid = _crear(anonimo, uid).json()["eeid"]
+    assert anonimo.patch(f"{URL}/{eeid}", headers=sesion(uid), json=cambios).status_code == 422
 
 
 def test_editar_sin_cambios_da_400(anonimo, uid):

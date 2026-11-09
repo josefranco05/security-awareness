@@ -22,12 +22,25 @@ class Settings(BaseSettings):
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",  # el .env puede tener variables que no son de aquí
+        # Un error de validación no repite el valor: las URLs de base llevan la contraseña.
+        hide_input_in_errors=True,
     )
 
-    # --- Base de datos -------------------------------------------------
-    # Se pueden sobreescribir para apuntar a una base de pruebas.
-    DATABASE_URL: str
-    WORKER_DATABASE_URL: str
+    # --- Base de datos (PostgreSQL) ------------------------------------
+    # Misma base, dos drivers: asyncpg para la web y psycopg para el worker,
+    # los endpoints `def` y Alembic. P. ej. (127.0.0.1, no localhost: en Windows localhost
+    # prueba antes ::1, donde Docker no publica el puerto, y cada conexión espera al timeout):
+    #   DATABASE_URL=postgresql+asyncpg://sentinel:sentinel@127.0.0.1:5433/sentinel
+    #   WORKER_DATABASE_URL=postgresql+psycopg://sentinel:sentinel@127.0.0.1:5433/sentinel
+    # SecretStr: llevan la contraseña; así no salen en logs ni en errores de validación.
+    DATABASE_URL: SecretStr
+    WORKER_DATABASE_URL: SecretStr
+    # Por proceso y por motor. Conexiones máximas ≈ (POOL + OVERFLOW) × 2 motores
+    # × workers de gunicorn × réplicas: debe caber en max_connections de PostgreSQL.
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    # Segundos para abrir una conexión antes de darla por fallida.
+    DB_CONNECT_TIMEOUT: int = 10
 
     # --- Celery --------------------------------------------------------
     CELERY_BROKER_URL: str
@@ -70,6 +83,16 @@ class Settings(BaseSettings):
     # Por usuario y por worker de gunicorn: el tope real es este × WEB_CONCURRENCY.
     ANALISIS_POR_MINUTO: int = 30
 
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _url_asincrona(cls, valor: SecretStr) -> SecretStr:
+        return _exigir_driver(valor, "postgresql+asyncpg://", "DATABASE_URL")
+
+    @field_validator("WORKER_DATABASE_URL")
+    @classmethod
+    def _url_sincrona(cls, valor: SecretStr) -> SecretStr:
+        return _exigir_driver(valor, "postgresql+psycopg://", "WORKER_DATABASE_URL")
+
     @field_validator("EMAIL_BACKEND", mode="before")
     @classmethod
     def _normalizar_backend(cls, valor: object) -> object:
@@ -88,6 +111,13 @@ class Settings(BaseSettings):
         if isinstance(valor, str) and valor.strip().lower() in {"si", "sí"}:
             return True
         return valor
+
+
+def _exigir_driver(url: SecretStr, prefijo: str, nombre: str) -> SecretStr:
+    # Falla al arrancar, no en la primera consulta: p. ej. un .env viejo que aún apunta a SQLite.
+    if not url.get_secret_value().startswith(prefijo):
+        raise ValueError(f"{nombre} debe empezar por {prefijo}")
+    return url
 
 
 settings = Settings()  # pyright: ignore[reportCallIssue]

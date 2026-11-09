@@ -677,7 +677,7 @@ Códigos HTTP usados: `200` lectura correcta · `201` creación · `204` éxito 
 
 **Como** operador **quiero** desplegar sin intermediario de mensajería **para** demostrar el sistema sin infraestructura adicional.
 
-**Prioridad:** S · **Archivos:** `worker/celery_app.py`, `startup.sh`
+**Prioridad:** S · **Archivos:** `worker/celery_app.py`, `docker-compose.yml`
 
 **Criterios de aceptación**
 
@@ -692,13 +692,14 @@ Códigos HTTP usados: `200` lectura correcta · `201` creación · `204` éxito 
 
 **Como** operador **quiero** que cada confirmación en la rama principal se valide y despliegue **para** reducir el error manual en las entregas.
 
-**Prioridad:** S · **Archivo:** `azure-pipelines.yml`
+**Prioridad:** S · **Archivos:** `.github/workflows/ci.yml`, `Dockerfile`
 
 **Criterios de aceptación**
 
 - **CA-39.1** Dado un cambio en la rama principal, entonces se dispara la compilación automáticamente.
 - **CA-39.2** Dado que la aplicación no importa correctamente, entonces la compilación falla y no se despliega.
 - **CA-39.3** Dado que la compilación tiene éxito, entonces el paquete se publica en el servicio de aplicaciones.
+  > ⚠️ **Carencia actual:** el CI construye y valida la imagen, pero aún no la publica: la publicación en Azure Container Registry y el despliegue en Azure Container Apps llegan con esa infraestructura.
 - **CA-39.4** Dado el paquete desplegado, entonces la hoja de estilos se entrega minificada y el repositorio conserva la versión legible.
 - **CA-39.5** Dado que la compilación requiere variables de entorno, entonces se usan valores ficticios que no sobrescriben la configuración real del servicio.
 
@@ -717,7 +718,6 @@ Códigos HTTP usados: `200` lectura correcta · `201` creación · `204` éxito 
 - **CA-40.3** Dado que el archivo local contiene variables ajenas a la configuración, entonces se ignoran sin producir error.
 - **CA-40.4** Dado que la cookie segura está activada, cuando el navegador accede por HTTP, entonces el inicio de sesión no persiste y debe documentarse la excepción para desarrollo local.
 - **CA-40.5** Dado que el repositorio se clona por primera vez, entonces existe un archivo de configuración de ejemplo que permite arrancar la aplicación.
-  > ⚠️ **Carencia actual:** `.env.example` está referenciado en `.gitignore` pero no existe en el repositorio.
 
 ---
 
@@ -731,7 +731,7 @@ Códigos HTTP usados: `200` lectura correcta · `201` creación · `204` éxito 
 | HU-24 … HU-28 | `worker/tasks.py`, `services/email.py`, `worker/celery_app.py` | Tareas `enviar_campaña`, `barrer_pendientes`, `recuperar_colgadas` |
 | HU-29 … HU-31 | `routers/webhooks.py` | `/api/webhooks/acs` |
 | HU-32 … HU-35 | `routers/simulaciones.py`, `templates/campañas.html`, `templates/deteccion.html` | `/api/simulaciones/*`, `/campañas`, `/deteccion` |
-| HU-36 … HU-40 | `main.py`, `core/config.py`, `azure-pipelines.yml`, `startup.sh` | Transversal |
+| HU-36 … HU-40 | `main.py`, `core/config.py`, `.github/workflows/ci.yml`, `Dockerfile`, `gunicorn.conf.py` | Transversal |
 
 ---
 

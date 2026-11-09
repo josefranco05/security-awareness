@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import inspect
 import logging
-from uuid import uuid4
 
 import pytest
 from sqlalchemy.exc import OperationalError
@@ -14,6 +13,7 @@ from ml.inferencia import MAX_BYTES_CUERPO
 import main
 import models
 from routers import phishing
+from tests.conftest import crear_usuario
 
 URL = phishing.RUTA_ANALISIS
 EXTENSION = {"Origin": "chrome-extension://abcdefghijklmnop"}
@@ -165,11 +165,11 @@ def test_exceder_el_limite_da_429_con_retry_after(client, monkeypatch):
 
 def test_el_limite_es_por_usuario(client, monkeypatch):
     _limite_de(monkeypatch, 1)
-    usuario = {"uid": uuid4()}
+    usuario = {"uid": crear_usuario("beto")[0]}
     main.app.dependency_overrides[phishing.require_extension_token] = lambda: usuario["uid"]
     assert _post(client, {"body": "uno"}).status_code == 200
     assert _post(client, {"body": "dos"}).status_code == 429
-    usuario["uid"] = uuid4()
+    usuario["uid"] = crear_usuario("ceci")[0]
     assert _post(client, {"body": "tres"}).status_code == 200
 
 
@@ -219,7 +219,7 @@ def test_el_log_solo_lleva_metadatos(client, caplog):
 # --- persistencia -----------------------------------------------------------------------
 
 def test_guarda_el_resultado_para_su_dueño(client):
-    dueño = uuid4()
+    dueño, _ = crear_usuario("dueño")
     main.app.dependency_overrides[phishing.require_extension_token] = lambda: dueño
     datos = _post(client, PHISHING).json()
     [d] = _detecciones()

@@ -11,10 +11,12 @@ from sqlalchemy.orm import sessionmaker
 
 from core.config import settings
 
-# timeout: espera hasta 30 s si la web tiene la base bloqueada.
 engine = create_engine(
-    settings.WORKER_DATABASE_URL,
-    connect_args={"timeout": 30, "check_same_thread": False},
+    settings.WORKER_DATABASE_URL.get_secret_value(),
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": settings.DB_CONNECT_TIMEOUT},
 )
 
 

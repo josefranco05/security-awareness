@@ -1,0 +1,35 @@
+# Solo entra lo que la app necesita en ejecución.
+
+# Secretos y entorno local: NUNCA en la imagen.
+.env
+.env.*
+
+# Entornos y cachés
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+*.db
+*.db-*
+
+# Control de versiones, editor y herramientas
+.git/
+.gitignore
+.gitattributes
+.vscode/
+.idea/
+.claude/
+
+# Pruebas, extensión del navegador y entrenamiento: no se ejecutan en el servidor.
+# data/ son los datasets de entrenamiento: la app solo usa ml/artifacts/model.joblib.
+tests/
+ml/tests/
+extension/
+data/
+
+# Infraestructura y documentación
+Dockerfile
+.dockerignore
+docker-compose.yml
+.github/
+*.md

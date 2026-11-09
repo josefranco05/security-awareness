@@ -56,6 +56,10 @@ def test_registro_rechaza_duplicados_sin_importar_mayusculas(anonimo, cambios):
     {"username": ""},
     {"username": "a" * 51},
     {"nombre": ""},
+    # Más largo que la columna: PostgreSQL lo rechazaría con un 500.
+    {"nombre": "a" * 101},
+    {"apellidos": "a" * 101},
+    {"email": "a" * 250 + "@example.com"},
 ])
 def test_registro_valida_los_campos(anonimo, cambios):
     assert _registrar(anonimo, **cambios).status_code == 422
@@ -119,6 +123,12 @@ def test_actualizar_cambia_solo_lo_enviado(anonimo):
     assert r.json() == {
         "uid": str(uid), "username": "ana", "nombre": "Ana María", "apellidos": "b", "email": "nuevo@example.com",
     }
+
+
+@pytest.mark.parametrize("cambios", [{"nombre": "a" * 101}, {"apellidos": "a" * 101}])
+def test_actualizar_valida_el_largo(anonimo, cambios):
+    uid, _ = crear_usuario()
+    assert anonimo.patch(f"{URL}/{uid}", headers=sesion(uid), json=cambios).status_code == 422
 
 
 def test_actualizar_sin_cambios_da_400(anonimo):

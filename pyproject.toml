@@ -18,9 +18,11 @@ dependencies = [
     "jinja2>=3.1",
     "itsdangerous>=2.2",
     "python-dotenv>=1.2",
-    # Base de datos
+    # Base de datos (PostgreSQL): asyncpg para la web, psycopg para el worker y Alembic.
     "sqlalchemy[asyncio]>=2.0.54",
-    "aiosqlite>=0.22",
+    "asyncpg>=0.30",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.16",
     # Worker / colas
     "celery[redis]>=5.6,<6",
     "redis>=5,<7",
@@ -37,7 +39,9 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=9.2.0"]
+dev = [
+    "pytest>=9.2.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "ml/tests"]

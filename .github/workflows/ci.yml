@@ -1,0 +1,120 @@
+# CI: pruebas y construcción de la imagen. La publicación en ACR y el despliegue en
+# Azure Container Apps (con OIDC, sin secretos guardados) se añaden en la fase 4.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Mínimo privilegio: el workflow solo lee el código.
+permissions:
+  contents: read
+
+# Un push nuevo a la misma rama o PR cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.11.29"
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Pruebas sobre PostgreSQL real, en el mismo puerto que docker-compose.yml:
+    # tests/conftest.py usa ese servidor por defecto (TEST_POSTGRES_URL).
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel
+          POSTGRES_DB: sentinel
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      # --frozen: instala exactamente uv.lock y falla si no coincide con pyproject.toml.
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # conftest.py crea y borra su propia base (con las migraciones aplicadas)
+      # y comprueba que los modelos no se desvíen de ellas.
+      - name: Run tests (pytest)
+        run: uv run --frozen pytest -q
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run extension tests (node)
+        run: node --test "extension/tests/*.test.js"
+
+  image:
+    name: Build image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Etiqueta inmutable: el commit. load: deja la imagen en el agente para validarla.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: sentinel:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Dentro de la imagen, no en el agente: comprueba lo que de verdad se desplegará.
+      # Valores ficticios solo para el import; crear los motores no conecta.
+      - name: Validate image (imports and model)
+        run: |
+          docker run --rm \
+            -e SECRET_KEY=build-only-dummy \
+            -e SECRET_KEY_AUTH=build-only-dummy \
+            -e ACS_WEBHOOK_SECRET=build-only-dummy \
+            -e DATABASE_URL=postgresql+asyncpg://build:build@127.0.0.1:1/build \
+            -e WORKER_DATABASE_URL=postgresql+psycopg://build:build@127.0.0.1:1/build \
+            -e CELERY_BROKER_URL=memory:// \
+            -e EMAIL_BACKEND=log \
+            -e ALLOWED_ORIGINS='["http://localhost"]' \
+            sentinel:${{ github.sha }} \
+            python -c "import main; from ml.inferencia import cargar_modelo; cargar_modelo(); print('imagen OK: main.py y modelo')"
+
+      # Nada que no deba viajar: secretos, pruebas ni datasets de entrenamiento.
+      - name: Validate image contents
+        run: |
+          docker run --rm --entrypoint sh sentinel:${{ github.sha }} -c '
+            for f in .env tests data extension; do
+              [ -e "/app/$f" ] && echo "No debería estar en la imagen: $f" && exit 1
+            done
+            [ "$(id -u)" != "0" ] || { echo "La imagen corre como root"; exit 1; }
+            echo "contenido de la imagen OK"'
