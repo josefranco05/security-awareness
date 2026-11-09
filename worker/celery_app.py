@@ -28,7 +28,7 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
-    broker_transport_options={"visibility_timeout": 3600},
+    broker_transport_options={"visibility_timeout": 3600, "global_keyprefix": "{sentinel}"},
     timezone="UTC",
     enable_utc=True,
     beat_schedule={
