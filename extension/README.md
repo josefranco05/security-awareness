@@ -6,9 +6,11 @@ Analiza el correo abierto en Gmail u Outlook web. No tiene dependencias ni paso 
 
 1. Abre `chrome://extensions` y activa el **Modo de desarrollador**.
 2. Pulsa **Cargar descomprimida** y elige esta carpeta.
-3. Arranca la app en `http://localhost:8000`.
+3. Inicia sesión en la demo: https://sentinel-web.nicedune-21623311.northcentralus.azurecontainerapps.io
 
-Para otro servidor, cambia `API_URL` en `popup.js` y añade su origen a `host_permissions` en `manifest.json`.
+Para la app en local, cambia `API_URL` en `popup.js` a `http://localhost:8000/api/phishing/analizar`
+(ese origen ya está en `host_permissions`). Para otro servidor, añade también su origen a `host_permissions`
+en `manifest.json`.
 
 ## Uso
 

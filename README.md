@@ -51,8 +51,8 @@ Analiza el correo abierto en Gmail u Outlook web (Chrome 116+, sin compilación)
 2. En Sentinel, ve a **Mi cuenta** → **Generar token** y pégalo en el popup de la extensión.
 3. Abre un correo y pulsa **Analizar este correo**.
 
-Por defecto apunta a `http://localhost:8000`; para usarla con la demo, cambia `API_URL` en
-`extension/popup.js` y añade el origen a `host_permissions` en `extension/manifest.json`.
+Por defecto apunta a la demo; para usarla con la app en local, cambia `API_URL` en
+`extension/popup.js` a `http://localhost:8000/api/phishing/analizar`.
 Para explicaciones más detalladas, visita [extension/README.md](extension/README.md).
 
 ## Pruebas

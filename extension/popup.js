@@ -1,6 +1,6 @@
 // El popup llama a la API por sí mismo: con host_permissions no le aplica CORS, así que
 // no hace falta service worker. El token solo sale hacia API_URL.
-const API_URL = "http://localhost:8000/api/phishing/analizar";
+const API_URL = "https://sentinel-web.nicedune-21623311.northcentralus.azurecontainerapps.io/api/phishing/analizar";
 
 const PROVEEDORES = {
   "mail.google.com": "gmail",

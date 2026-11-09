@@ -10,6 +10,7 @@
   },
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
+    "https://sentinel-web.nicedune-21623311.northcentralus.azurecontainerapps.io/*",
     "http://localhost:8000/*",
     "http://127.0.0.1:8000/*"
   ]
